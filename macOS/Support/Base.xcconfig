@@ -1,0 +1,13 @@
+GENERATE_INFOPLIST_FILE = YES
+CODE_SIGN_ENTITLEMENTS = Support/XToolMac.entitlements
+CODE_SIGN_STYLE = Automatic
+ENABLE_HARDENED_RUNTIME = YES
+
+PRODUCT_NAME = xtool
+PRODUCT_MODULE_NAME = XToolMac
+
+INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.developer-tools
+INFOPLIST_KEY_NSHumanReadableCopyright = Copyright © 2026 Hồ Đức Minh (zheedevVn). All rights reserved.
+
+#include? "Private-Team.xcconfig"
+#include? "Private.xcconfig"
