@@ -1,4 +1,4 @@
-# Contributing to xtool
+# Contributing to XzheeTool
 
 ## Bug reports and feature requests
 
