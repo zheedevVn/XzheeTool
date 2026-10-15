@@ -1,30 +1,34 @@
 <div align="center">
 
-# XzheeTool
+  <img src="assets/banner.svg" alt="XzheeTool Banner" width="100%">
 
-### Cross-platform Xcode Replacement Tool & Library
+  <br/>
 
-<p>
-  <b>Công cụ đa nền tảng thay thế Xcode — Xây dựng, ký số và nạp ứng dụng iOS trực tiếp trên Linux, Windows (WSL) và macOS.</b>
-</p>
+  <p align="center">
+    <a href="LICENSE.md"><img src="https://img.shields.io/badge/License-MIT-00D2FF?style=for-the-badge&logo=opensourceinitiative&logoColor=white" alt="MIT License"></a>
+    <a href="https://swift.org"><img src="https://img.shields.io/badge/Swift-6.0+-F05138?style=for-the-badge&logo=swift&logoColor=white" alt="Swift 6.0+"></a>
+    <a href="https://github.com/zheedevVn"><img src="https://img.shields.io/badge/Author-zheedevVn-10B981?style=for-the-badge&logo=github&logoColor=white" alt="Author"></a>
+    <img src="https://img.shields.io/badge/Platform-Cross--Platform-8B5CF6?style=for-the-badge" alt="Platform">
+  </p>
 
-<p>
-  <a href="LICENSE.md"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
-  <a href="https://swift.org"><img src="https://img.shields.io/badge/Swift-6.0+-F05138.svg?logo=swift&logoColor=white" alt="Swift 6.0+"></a>
-  <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows%20(WSL)-555555.svg" alt="Platform">
-  <a href="https://github.com/zheedevVn"><img src="https://img.shields.io/badge/Author-H%E1%BB%93%20%C4%90%E1%BB%A9c%20Minh%20(zheedevVn)-success.svg" alt="Author"></a>
-</p>
+  <p align="center">
+    <a href="#english"><img src="https://img.shields.io/badge/Read%20in-English-1e293b?style=for-the-badge&logo=googletranslate&logoColor=60A5FA" alt="English"></a>
+    &nbsp;&nbsp;
+    <a href="#tieng-viet"><img src="https://img.shields.io/badge/%C4%90%E1%BB%8Dc%20b%E1%BA%A1n-Ti%E1%BA%BFng%20Vi%E1%BB%87t-1e293b?style=for-the-badge&logo=googletranslate&logoColor=F87171" alt="Tiếng Việt"></a>
+  </p>
 
-<p>
-  <b><a href="#english">English</a></b> &nbsp;&bull;&nbsp; <b><a href="#tieng-viet">Tiếng Việt</a></b>
-</p>
+  <br/>
+
+| 🚀 Không Cần Máy Mac | ⚡ Cài Đặt Trực Tiếp USB | 🔐 Tự Động Ký Số | 📦 Chuẩn SwiftPM Thuần |
+| :---: | :---: | :---: | :---: |
+| Biên dịch iOS trên Linux / WSL | Nạp & chạy app trên iPhone thật | Quản lý Profile & Certificate | Hoàn toàn theo chuẩn mở |
 
 </div>
 
 ---
 
 <a id="english"></a>
-## English
+## 🌐 English
 
 ### Overview
 
@@ -108,7 +112,7 @@ targets: [
 ---
 
 <a id="tieng-viet"></a>
-## Tiếng Việt
+## 🇻🇳 Tiếng Việt
 
 ### Tổng quan
 
@@ -174,7 +178,7 @@ targets: [
 
 ---
 
-## Tác giả & Bản quyền / Author & License
+## 👨‍💻 Tác giả & Bản quyền / Author & License
 
 - **Tác giả / Author**: **Hồ Đức Minh (zheedevVn)**
 - **GitHub**: [@zheedevVn](https://github.com/zheedevVn)
