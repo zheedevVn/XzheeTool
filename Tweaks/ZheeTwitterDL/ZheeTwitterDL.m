@@ -58,7 +58,7 @@ static void ZheeSaveKey(NSString *key) {
         (__bridge id)kSecAttrAccount : kKeychainAccount,
     };
     NSDictionary *attrs = @{ (__bridge id)kSecValueData : data };
-    if (SecItemUpdate((__bridge CFDictionaryRef)q, (__bridge CFDictionaryRef)attrs) == errSecNotFound) {
+    if (SecItemUpdate((__bridge CFDictionaryRef)q, (__bridge CFDictionaryRef)attrs) == errSecItemNotFound) {
         NSMutableDictionary *add = [q mutableCopy];
         add[(__bridge id)kSecValueData] = data;
         SecItemAdd((__bridge CFDictionaryRef)add, NULL);
