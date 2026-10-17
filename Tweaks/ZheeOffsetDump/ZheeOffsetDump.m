@@ -285,7 +285,9 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, assign) BOOL userClosedPanel; // user vua dong panel
 @property (nonatomic, assign) UIBackgroundTaskIdentifier bgTask; // task giu dump chay khi app ra nen
 @property (nonatomic, strong) UIView *autoloadView; // man hinh autoload luc moi vao app
-@property (nonatomic, assign) BOOL autoloadFinished; // autoload chay xong chua
+@property (nonatomic, assign) BOOL didShowAfterAutoload; // maybeShowAfterAutoload chi chay 1 lan (tranh rung 2 lan)
+@property (nonatomic, strong) UIImageView *aboutAvatarView; // anh avatar tab About (de cap nhat khi tai xong)
+@property (nonatomic, assign) BOOL avatarDownloading;
 @property (nonatomic, assign) BOOL pendingUpdate; // co update doi sau autoload khong
 @property (nonatomic, strong) NSMutableString *logBuf; // buffer log, flush theo dot (khong noi chuoi O(n^2) tren UI)
 @property (nonatomic, assign) BOOL logFlushPending;
@@ -431,7 +433,9 @@ static int cMN(const void *a, const void *b) {
 }
 
 - (void)maybeShowAfterAutoload {
+    if (self.didShowAfterAutoload) return; // chi chay 1 lan, tranh rung 2 lan
     if (!self.cfgChecked || !self.autoloadFinished) return;
+    self.didShowAfterAutoload = YES;
     UIView *al = self.autoloadView;
     self.autoloadView = nil;
     [UIView animateWithDuration:0.3 animations:^{
@@ -715,6 +719,7 @@ static int cMN(const void *a, const void *b) {
         if (zDA()) return; // debugger dinh kem -> khong chay
         [self loadCfgCache]; // cau hinh UI da cache tu lan mo truoc
         [self lS];
+        [self prefetchAvatar]; // tai avatar som, nut noi hien avatar ngay khi tai xong (khong doi toi bP)
         UIWindowScene *scene = nil;
         for (UIScene *s in UIApplication.sharedApplication.connectedScenes) {
             if ([s isKindOfClass:[UIWindowScene class]] && s.activationState == UISceneActivationStateForegroundActive) { scene = (UIWindowScene *)s; break; }
@@ -1250,19 +1255,33 @@ static int cMN(const void *a, const void *b) {
     self.fB.imageView.clipsToBounds = YES;
 }
 
-- (void)loadAvatarInto:(UIImageView *)iv {
+// Tai avatar som (goi ngay tu st, truoc bP) de nut noi hien avatar cang som cang tot.
+- (void)prefetchAvatar {
     NSString *cache = [NSTemporaryDirectory() stringByAppendingPathComponent:@"zhee-avatar.png"];
-    NSData *cached = [NSData dataWithContentsOfFile:cache];
-    if (cached) { UIImage *img = [UIImage imageWithData:cached]; if (img) { iv.image = img; return; } }
+    if ([NSData dataWithContentsOfFile:cache]) return; // da co cache
+    if (self.avatarDownloading) return;
+    self.avatarDownloading = YES;
     NSURL *url = [NSURL URLWithString:[self cfgStr:@"avatarURL" def:@"https://github.com/zheedevVn.png"]];
-    if (!url) return;
+    if (!url) { self.avatarDownloading = NO; return; }
     [[NSURLSession.sharedSession dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
+        self.avatarDownloading = NO;
         if (!data || err) return;
         UIImage *img = [UIImage imageWithData:data];
         if (!img) return;
         [data writeToFile:cache atomically:YES];
-        dispatch_async(dispatch_get_main_queue(), ^{ iv.image = img; [self setFloatAvatar]; });
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self setFloatAvatar];
+            if (self.aboutAvatarView) self.aboutAvatarView.image = img;
+        });
     }] resume];
+}
+
+- (void)loadAvatarInto:(UIImageView *)iv {
+    NSString *cache = [NSTemporaryDirectory() stringByAppendingPathComponent:@"zhee-avatar.png"];
+    NSData *cached = [NSData dataWithContentsOfFile:cache];
+    if (cached) { UIImage *img = [UIImage imageWithData:cached]; if (img) { iv.image = img; return; } }
+    self.aboutAvatarView = iv;
+    [self prefetchAvatar];
 }
 
 // Hieu ung morph cho icon: nay 1 cai (pop) + nhip morph lien tuc (scale nhe, lap lai).
