@@ -689,19 +689,12 @@ static int cMN(const void *a, const void *b) {
         self.fB.backgroundColor = [UIColor colorWithRed:0.04 green:0.04 blue:0.09 alpha:1];
         self.fB.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.25].CGColor;
         self.fB.layer.borderWidth = 1;
-        self.fB.layer.shadowColor = [UIColor colorWithRed:0.0 green:0.82 blue:1.0 alpha:1].CGColor; // glow cyan tho nhe
-        self.fB.layer.shadowOpacity = 0.6; self.fB.layer.shadowRadius = 14;
+        self.fB.layer.shadowColor = UIColor.blackColor.CGColor; // bong den nhe, khong neon
+        self.fB.layer.shadowOpacity = 0.3; self.fB.layer.shadowRadius = 8;
         self.fB.layer.shadowOffset = CGSizeMake(0, 4);
-        // Nut noi tho nhe (glow pulse lap lai).
-        CABasicAnimation *glow = [CABasicAnimation animationWithKeyPath:@"shadowOpacity"];
-        glow.fromValue = @(0.35); glow.toValue = @(0.85); glow.duration = 1.4;
-        glow.autoreverses = YES; glow.repeatCount = HUGE_VALF;
-        glow.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
-        [self.fB.layer addAnimation:glow forKey:@"glow"];
-        UIView *logo = [self zL:size * 0.62];
-        logo.center = CGPointMake(size / 2, size / 2);
-        logo.userInteractionEnabled = NO;
-        [self.fB addSubview:logo];
+        self.fB.clipsToBounds = YES; // anh avatar cat theo hinh tron nut
+        self.fB.adjustsImageWhenHighlighted = NO;
+        [self setFloatAvatar]; // nut noi = avatar user (khong con chu Z)
         [self.fB addTarget:self action:@selector(tP) forControlEvents:UIControlEventTouchUpInside];
         [self.fB addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dFl:)]];
         [self.fW addSubview:self.fB];
@@ -1197,6 +1190,17 @@ static int cMN(const void *a, const void *b) {
 }
 
 // Tai avatar GitHub (github.com/zheedevVn.png) vao UIImageView, cache o tmp.
+// Nut noi = avatar user (doc tu cache; chua co thi de tron den, tai xong se cap nhat).
+- (void)setFloatAvatar {
+    if (!self.fB) return;
+    NSData *cached = [NSData dataWithContentsOfFile:[NSTemporaryDirectory() stringByAppendingPathComponent:@"zhee-avatar.png"]];
+    UIImage *img = cached ? [UIImage imageWithData:cached] : nil;
+    if (!img) return;
+    [self.fB setImage:img forState:UIControlStateNormal];
+    self.fB.imageView.contentMode = UIViewContentModeScaleAspectFill;
+    self.fB.imageView.clipsToBounds = YES;
+}
+
 - (void)loadAvatarInto:(UIImageView *)iv {
     NSString *cache = [NSTemporaryDirectory() stringByAppendingPathComponent:@"zhee-avatar.png"];
     NSData *cached = [NSData dataWithContentsOfFile:cache];
@@ -1208,7 +1212,7 @@ static int cMN(const void *a, const void *b) {
         UIImage *img = [UIImage imageWithData:data];
         if (!img) return;
         [data writeToFile:cache atomically:YES];
-        dispatch_async(dispatch_get_main_queue(), ^{ iv.image = img; });
+        dispatch_async(dispatch_get_main_queue(), ^{ iv.image = img; [self setFloatAvatar]; });
     }] resume];
 }
 
