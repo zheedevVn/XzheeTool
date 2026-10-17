@@ -1,7 +1,21 @@
-# ZheeOffsetDump — Dylib dump offset: framework (ObjC) + metadata (il2cpp)
+# ZheeOffsetDump v4 — Dylib dump offset: framework (ObjC) + metadata (il2cpp)
 
-Inject vào app mục tiêu → tự động quét, ghi offset ra file.
+Inject vào app bất kỳ → tự động quét, ghi offset ra file.
 Không hook, không sửa gì trong app — chỉ đọc runtime.
+Chạy trên mọi app (không hardcode bundle ID).
+
+## Panel
+
+Nút nổi logo Z (kéo thả) → panel 3 tab, mở app là tự chạy dump:
+
+- **Dump**: log live + thanh tiến trình + nút Dump lại / Xóa file / Xuất ra Tải về.
+- **Cài đặt**: toggle từng phần (Tự động Dump, ObjC, Symbols, il2cpp,
+  Xuất file gốc, **Full offset**), chọn kích thước panel (Nhỏ / Vừa / Lớn).
+  Cài đặt lưu tự động.
+- **About**: logo, tác giả Hồ Đức Minh — Zhee Dev, info app (bundle ID,
+  phiên bản, thiết bị, iOS).
+
+Panel tự dựng lại khi xoay ngang/dọc.
 
 ## Output
 
@@ -9,11 +23,12 @@ Trong Documents của app, sau khi dump xong:
 
 - **`ZheeOffsets.txt`**: header (bundle ID, executable, toàn bộ image đã load
   kèm base + size) + ObjC theo từng image **trong app bundle** (`offset = IMP - base`,
-  không phụ thuộc ASLR; bỏ method của system framework cho nhẹ file) + Mach-O symbols (C/C++)
-  của image trong app bundle + metadata header.
+  không phụ thuộc ASLR; bật **Full offset** trong Cài đặt để dump cả system framework)
+  + Mach-O symbols (C/C++) + metadata header.
 - **`dump.cs`**: il2cpp (app Unity) qua API lúc runtime — assembly → class →
   method (tên, signature, `methodPointer`, offset/RVA) + field (tên, type, field offset).
   Tương đương output của Il2CppDumper nhưng lấy từ runtime (đã giải mã).
+  Cuối dump có dòng kiểm tra: mọi offset đều nằm trong image chứa nó.
 - **`global-metadata.dat`**: copy nguyên file metadata của app — đầu vào cho Il2CppDumper.
 - **`UnityFramework`**: copy nguyên binary UnityFramework — đầu vào cho Il2CppDumper.
 
@@ -50,10 +65,12 @@ Dylib cố tình né các dấu vết mà hệ thống chống tool hay quét:
   IMP bị hook sẽ không thấy gì đổi.
 - **Không gọi API debugger** (`ptrace`, `task_for_pid`, sysctl debug) —
   không chạm vào anti-debug.
-- **Delay ngẫu nhiên 3–8s** trước khi hiện panel/chạy dump — không có
+- **Delay ngẫu nhiên 1–2s** trước khi hiện panel/chạy dump — không có
   timing cố định để fingerprint.
 - **Nút "Xóa file"** trong panel: copy file xong bấm xóa để dọn dấu vết
   (anti-cheat hay quét Documents tìm `dump.cs`).
+- **Không crash khi gặp kiểm tra**: mọi bước dump đều kiểm tra biên /
+  con trỏ NULL trước khi đọc; lỗi chỉ ghi log, không crash app host.
 
 **Giới hạn nói thẳng**: nếu app quét danh sách image đã load (dyld) tìm
 dylib lạ, hoặc tự kiểm tra chữ ký binary của chính nó, thì **bất kỳ dylib
@@ -63,7 +80,10 @@ rồi cài lại bản app sạch (không inject) để chơi/bình thường.
 
 ## Ghi chú
 
-- Không dump symbol C — chỉ ObjC runtime + il2cpp (class/method/field).
+- Dump cả symbol C (Mach-O symtab) + ObjC runtime + il2cpp (class/method/field).
 - `methodPointer` đọc từ field đầu tiên của `MethodInfo` (ổn định qua các
   bản il2cpp).
+- Offset = địa chỉ − base của image chứa nó (không phụ thuộc ASLR).
+  Cuối mỗi lần dump, dylib tự kiểm tra: mọi offset đều nằm trong image —
+  nếu có method nào rơi ngoài image sẽ ghi rõ số lượng vào log.
 - Cần iOS 14+.
