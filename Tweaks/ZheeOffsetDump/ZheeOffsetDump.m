@@ -125,7 +125,21 @@ typedef const Il2CppType *(*FnFieldType)(const FieldInfo *);
 typedef char *(*FnTypeName)(const Il2CppType *);
 typedef void (*FnFree)(void *);
 
-static void *zSym(const char *name) { return dlsym(RTLD_DEFAULT, name); }
+static void *zSym(const char *name) {
+    void *p = dlsym(RTLD_DEFAULT, name);
+    if (p) return p;
+    // il2cpp co the nam o image rieng (vd Lien Quan) -> quet tat ca image da load.
+    uint32_t n = _dyld_image_count();
+    for (uint32_t i = 0; i < n; i++) {
+        const char *path = _dyld_get_image_name(i);
+        if (!path) continue;
+        void *h = dlopen(path, RTLD_NOLOAD | RTLD_LAZY);
+        if (!h) continue;
+        p = dlsym(h, name);
+        if (p) return p;
+    }
+    return NULL;
+}
 
 // ---------------------------------------------------------------------------
 // Image range
