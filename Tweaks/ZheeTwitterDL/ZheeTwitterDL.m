@@ -114,7 +114,7 @@ static NSString *ZheePickBestVideoURL(NSArray<NSString *> *cands) {
 // Panel + nút nổi
 // ---------------------------------------------------------------------------
 
-@interface ZheeTwitterDL : NSObject <NSURLSessionDownloadDelegate>
+@interface ZheeTwitterDL : NSObject <NSURLSessionDownloadDelegate, UITextFieldDelegate, UIGestureRecognizerDelegate>
 @property (nonatomic, strong) UIWindow *floatWindow;
 @property (nonatomic, strong) UIButton *floatButton;
 @property (nonatomic, strong) UIView *panel;
@@ -214,6 +214,16 @@ static NSString *ZheePickBestVideoURL(NSArray<NSString *> *cands) {
     self.panel.hidden = YES;
     self.panel.alpha = 0;
 
+    // Kéo để di chuyển panel (trừ khi chạm vào nút / ô nhập)
+    UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragPanel:)];
+    panelPan.delegate = self;
+    [self.panel addGestureRecognizer:panelPan];
+    // Chạm vùng trống để ẩn bàn phím
+    UITapGestureRecognizer *tapEmpty = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dismissKeyboard)];
+    tapEmpty.cancelsTouchesInView = NO;
+    tapEmpty.delegate = self;
+    [self.panel addGestureRecognizer:tapEmpty];
+
     UIVisualEffectView *blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleDark]];
     blur.frame = self.panel.bounds;
     blur.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -251,6 +261,7 @@ static NSString *ZheePickBestVideoURL(NSArray<NSString *> *cands) {
     self.linkField.autocorrectionType = UITextAutocorrectionTypeNo;
     self.linkField.keyboardType = UIKeyboardTypeURL;
     self.linkField.returnKeyType = UIReturnKeyDone;
+    self.linkField.delegate = self;
     self.linkField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"Dán link Tweet…" attributes:@{NSForegroundColorAttributeName: [UIColor.whiteColor colorWithAlphaComponent:0.45]}];
     [linkBox addSubview:self.linkField];
 
@@ -278,6 +289,7 @@ static NSString *ZheePickBestVideoURL(NSArray<NSString *> *cands) {
     self.keyField.textColor = UIColor.whiteColor;
     self.keyField.font = [UIFont systemFontOfSize:15];
     self.keyField.secureTextEntry = YES;
+    self.keyField.delegate = self;
     self.keyField.autocapitalizationType = UITextAutocapitalizationTypeNone;
     self.keyField.autocorrectionType = UITextAutocorrectionTypeNo;
     self.keyField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"Nhập Zhee key (1 lần)" attributes:@{NSForegroundColorAttributeName: [UIColor.whiteColor colorWithAlphaComponent:0.45]}];
@@ -338,6 +350,7 @@ static NSString *ZheePickBestVideoURL(NSArray<NSString *> *cands) {
 }
 
 - (void)togglePanel {
+    [self.floatWindow endEditing:YES];
     BOOL show = self.panel.hidden;
     self.panel.hidden = NO;
     [UIView animateWithDuration:0.25 animations:^{
@@ -345,6 +358,39 @@ static NSString *ZheePickBestVideoURL(NSArray<NSString *> *cands) {
         self.panel.transform = show ? CGAffineTransformIdentity : CGAffineTransformMakeScale(0.92, 0.92);
     } completion:^(BOOL f) { self.panel.hidden = !show; }];
     if (show && ZheeLoadKey() == nil) { self.keyRow.hidden = NO; [self.keyField becomeFirstResponder]; }
+}
+
+// Kéo panel + ẩn bàn phím
+- (void)dragPanel:(UIPanGestureRecognizer *)pan {
+    CGPoint t = [pan translationInView:self.floatWindow];
+    CGPoint c = self.panel.center;
+    c.x += t.x; c.y += t.y;
+    CGRect b = self.floatWindow.bounds;
+    CGFloat m = 60; // luôn chừa 60pt panel trong màn hình để không mất hút
+    CGFloat hw = self.panel.bounds.size.width / 2, hh = self.panel.bounds.size.height / 2;
+    c.x = MAX(hw - (self.panel.bounds.size.width - m), MIN(b.size.width - hw + (self.panel.bounds.size.width - m), c.x));
+    c.y = MAX(hh - (self.panel.bounds.size.height - m), MIN(b.size.height - hh + (self.panel.bounds.size.height - m), c.y));
+    self.panel.center = c;
+    [pan setTranslation:CGPointZero inView:self.floatWindow];
+}
+
+- (void)dismissKeyboard { [self.panel endEditing:YES]; }
+
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
+    [textField resignFirstResponder];
+    return YES;
+}
+
+// Chỉ bắt đầu kéo panel khi chạm vào vùng trống (không phải nút / ô nhập)
+- (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)g {
+    if (![g isKindOfClass:[UIPanGestureRecognizer class]]) return YES;
+    CGPoint p = [g locationInView:self.panel];
+    UIView *hit = [self.panel hitTest:p withEvent:nil];
+    while (hit) {
+        if ([hit isKindOfClass:[UIControl class]]) return NO;
+        hit = hit.superview;
+    }
+    return YES;
 }
 
 - (void)pasteLink {
