@@ -285,6 +285,7 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, assign) BOOL userClosedPanel; // user vua dong panel
 @property (nonatomic, assign) UIBackgroundTaskIdentifier bgTask; // task giu dump chay khi app ra nen
 @property (nonatomic, strong) UIView *autoloadView; // man hinh autoload luc moi vao app
+@property (nonatomic, assign) BOOL autoloadFinished; // autoload chay xong chua
 @property (nonatomic, assign) BOOL didShowAfterAutoload; // maybeShowAfterAutoload chi chay 1 lan (tranh rung 2 lan)
 @property (nonatomic, strong) UIImageView *aboutAvatarView; // anh avatar tab About (de cap nhat khi tai xong)
 @property (nonatomic, assign) BOOL avatarDownloading;
