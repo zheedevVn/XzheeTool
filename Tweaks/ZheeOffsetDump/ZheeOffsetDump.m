@@ -22,9 +22,11 @@
 #import <objc/runtime.h>
 #import <mach-o/dyld.h>
 #import <mach-o/loader.h>
+#import <mach-o/nlist.h>
 #import <dlfcn.h>
 #import <stdio.h>
 #import <stdlib.h>
+#import <stdarg.h>
 #import <string.h>
 
 // ---------------------------------------------------------------------------
