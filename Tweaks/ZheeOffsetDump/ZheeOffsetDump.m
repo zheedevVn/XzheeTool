@@ -488,7 +488,7 @@ static int cMN(const void *a, const void *b) {
     [UIView animateWithDuration:1.0 delay:0 options:UIViewAnimationOptionRepeat | UIViewAnimationOptionCurveEaseInOut animations:^{
         fill.frame = CGRectMake(trackW, 0, fillW, 5);
     } completion:nil];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         self.autoloadFinished = YES;
         [self maybeShowAfterAutoload];
     });
