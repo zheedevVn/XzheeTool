@@ -1086,6 +1086,33 @@ static int cMN(const void *a, const void *b) {
     }] resume];
 }
 
+// Hieu ung morph cho icon: nay 1 cai (pop) + nhip morph lien tuc (scale nhe, lap lai).
+- (void)morphPop:(UIView *)v delay:(CGFloat)dl {
+    v.transform = CGAffineTransformMakeScale(0.5, 0.5);
+    [UIView animateWithDuration:0.45 delay:dl usingSpringWithDamping:0.6 initialSpringVelocity:0.8 options:0 animations:^{
+        v.transform = CGAffineTransformIdentity;
+    } completion:nil];
+}
+- (void)morphPulse:(UIView *)v {
+    [v.layer removeAnimationForKey:@"morph"];
+    CABasicAnimation *s = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
+    s.fromValue = @(1.0); s.toValue = @(1.15); s.duration = 0.9;
+    s.autoreverses = YES; s.repeatCount = HUGE_VALF;
+    s.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+    [v.layer addAnimation:s forKey:@"morph"];
+}
+- (void)morphStop:(UIView *)v { [v.layer removeAnimationForKey:@"morph"]; }
+- (UIImageView *)sideIconAt:(NSInteger)idx {
+    if (idx < 0 || idx >= self.sideButtons.count) return nil;
+    for (UIView *v in self.sideButtons[idx].subviews) {
+        if ([v isKindOfClass:[UIImageView class]]) return (UIImageView *)v;
+    }
+    return nil;
+}
+- (NSInteger)selectedTabIndex {
+    return self.dTab.hidden ? (self.sTab.hidden ? 2 : 1) : 0;
+}
+
 - (void)updateSideButtons {
     for (UIButton *b in self.sideButtons) {
         BOOL sel = (b.tag == (self.dTab.hidden ? (self.sTab.hidden ? 2 : 1) : 0));
@@ -1112,6 +1139,15 @@ static int cMN(const void *a, const void *b) {
     UIView *show = (i == 0) ? self.dTab : (i == 1) ? self.sTab : self.aTab;
     show.alpha = 0;
     [UIView animateWithDuration:0.25 animations:^{ show.alpha = 1; }];
+    // Morph: dung nhip o icon cu, nay icon moi roi chay nhip morph lien tuc.
+    for (NSInteger k = 0; k < 3; k++) [self morphStop:[self sideIconAt:k]];
+    UIImageView *icon = [self sideIconAt:i];
+    if (icon) {
+        [self morphPop:icon delay:0];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.45 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self morphPulse:icon];
+        });
+    }
 }
 
 - (void)sC:(UISwitch *)sw {
@@ -1152,6 +1188,14 @@ static int cMN(const void *a, const void *b) {
             self.panel.alpha = 1;
             self.panel.transform = CGAffineTransformIdentity;
         } completion:nil];
+        // Morph: icon sidebar hien so le, roi nhip morph lien tuc o tab dang chon.
+        for (NSInteger k = 0; k < 3; k++) {
+            UIImageView *icon = [self sideIconAt:k];
+            if (icon) [self morphPop:icon delay:k * 0.08];
+        }
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self morphPulse:[self sideIconAt:[self selectedTabIndex]]];
+        });
     } else {
         [UIView animateWithDuration:0.22 animations:^{
             self.panel.alpha = 0;
