@@ -277,8 +277,10 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, assign) BOOL dFu;      // full offset: ca system framework
 @property (nonatomic, assign) NSInteger sM; // 0 Nho, 1 Vua, 2 Lon, 3 Tuy chinh (keo goc)
 @property (nonatomic, strong) NSMutableArray<UISwitch *> *allSwitches;
-@property (nonatomic, assign) CGFloat customW;
-@property (nonatomic, assign) CGFloat customH;
+@property (nonatomic, strong) UILabel *tabTitleLabel;
+@property (nonatomic, strong) UIImageView *tabTitleIcon;
+@property (nonatomic, assign) CGFloat dragScale;
+@property (nonatomic, assign) CGPoint dragStart;
 @end
 
 @implementation ZDC
@@ -316,8 +318,8 @@ static int cMN(const void *a, const void *b) {
 // ---------------------------------------------------------------------------
 - (void)lS {
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
-    // Mac dinh lay tu panel.json (GitHub) khi chua co gia tri da luu.
-    self.dE = [d objectForKey:zStr(kS27, sizeof(kS27))] ? [d boolForKey:zStr(kS27, sizeof(kS27))] : [self cfgBool:@"autoDumpDefault" def:YES];
+    // Tu dong Dump chi tinh trong phien: vao app luon lay mac dinh tu panel.json (khong luu trang thai TAT qua lan mo sau).
+    self.dE = [self cfgBool:@"autoDumpDefault" def:YES];
     self.dO = [d objectForKey:zStr(kS28, sizeof(kS28))] ? [d boolForKey:zStr(kS28, sizeof(kS28))] : [self cfgBool:@"dumpObjCDefault" def:YES];
     self.dSy = [d objectForKey:zStr(kS29, sizeof(kS29))] ? [d boolForKey:zStr(kS29, sizeof(kS29))] : [self cfgBool:@"dumpSymbolsDefault" def:YES];
     self.dI = [d objectForKey:zStr(kS30, sizeof(kS30))] ? [d boolForKey:zStr(kS30, sizeof(kS30))] : [self cfgBool:@"dumpIl2cppDefault" def:YES];
@@ -325,8 +327,8 @@ static int cMN(const void *a, const void *b) {
     self.dFu = [d objectForKey:zStr(kS32, sizeof(kS32))] ? [d boolForKey:zStr(kS32, sizeof(kS32))] : [self cfgBool:@"fullOffsetDefault" def:NO];
     self.sM = [d objectForKey:zStr(kS33, sizeof(kS33))] ? [d integerForKey:zStr(kS33, sizeof(kS33))] : MIN(2, MAX(0, [self cfgInt:@"sizeDefault" def:1]));
     if (self.sM < 0 || self.sM > 3) self.sM = 1;
-    self.customW = [d doubleForKey:@"zheedump.cw"];
-    self.customH = [d doubleForKey:@"zheedump.ch"];
+    self.panelScale = [d doubleForKey:@"zheedump.scale"];
+    if (self.panelScale < 0.6 || self.panelScale > 1.0) self.panelScale = 1.0;
 }
 
 // ---- Cau hinh UI tu xa (panel.json tren GitHub) ----
@@ -452,13 +454,13 @@ static int cMN(const void *a, const void *b) {
     // Tieu de + phu de.
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(16, 94, w - 32, 24)];
     title.text = @"Đang cập nhật giao diện…";
-    title.font = [UIFont boldSystemFontOfSize:17];
+    title.font = [self rF:17 w:UIFontWeightBold];
     title.textColor = [UIColor colorWithWhite:0.08 alpha:1];
     title.textAlignment = NSTextAlignmentCenter;
     [body addSubview:title];
     UILabel *sub = [[UILabel alloc] initWithFrame:CGRectMake(16, 120, w - 32, 18)];
     sub.text = @"Vui lòng đợi…";
-    sub.font = [UIFont systemFontOfSize:13];
+    sub.font = [self rF:13 w:UIFontWeightRegular];
     sub.textColor = [UIColor colorWithWhite:0.35 alpha:1];
     sub.textAlignment = NSTextAlignmentCenter;
     [body addSubview:sub];
@@ -496,15 +498,13 @@ static int cMN(const void *a, const void *b) {
 
 - (void)sSv {
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
-    [d setBool:self.dE forKey:zStr(kS27, sizeof(kS27))];
     [d setBool:self.dO forKey:zStr(kS28, sizeof(kS28))];
     [d setBool:self.dSy forKey:zStr(kS29, sizeof(kS29))];
     [d setBool:self.dI forKey:zStr(kS30, sizeof(kS30))];
     [d setBool:self.dER forKey:zStr(kS31, sizeof(kS31))];
     [d setBool:self.dFu forKey:zStr(kS32, sizeof(kS32))];
     [d setInteger:self.sM forKey:zStr(kS33, sizeof(kS33))];
-    [d setDouble:self.customW forKey:@"zheedump.cw"];
-    [d setDouble:self.customH forKey:@"zheedump.ch"];
+    [d setDouble:self.panelScale forKey:@"zheedump.scale"];
 }
 
 // Logo ZheeSign: chu Z neon (cyan -> tim -> hong) tren nen toi.
@@ -528,12 +528,14 @@ static int cMN(const void *a, const void *b) {
     return v;
 }
 
-- (CGSize)pS:(NSInteger)mode screen:(CGRect)screen {
-    if (mode == 3) return CGSizeMake(MIN(MAX(self.customW, 260), screen.size.width - 16),
-                                    MIN(MAX(self.customH, 320), screen.size.height - 32));
-    if (mode == 0) return CGSizeMake(screen.size.width - 64, screen.size.height - 120);
-    if (mode == 2) return CGSizeMake(screen.size.width - 16, screen.size.height - 32);
-    return CGSizeMake(screen.size.width - 32, screen.size.height - 64);
+- (UIColor *)acc { return [UIColor colorWithRed:1.0 green:0.35 blue:0.12 alpha:1]; } // cam accent kieu panel mau
+
+// Phong bo tron (SF Pro Rounded) kieu panel mau.
+- (UIFont *)rF:(CGFloat)size w:(UIFontWeight)w {
+    UIFontDescriptor *d = [UIFontDescriptor preferredFontDescriptorWithTextStyle:UIFontTextStyleBody];
+    d = [d fontDescriptorWithDesign:UIFontDescriptorSystemDesignRounded];
+    d = [d fontDescriptorByAddingAttributes:@{UIFontDescriptorTraitsAttribute: @{UIFontWeightTrait: @(w)}}];
+    return [UIFont fontWithDescriptor:d size:size];
 }
 
 - (void)st {
@@ -584,7 +586,7 @@ static int cMN(const void *a, const void *b) {
                                                      name:UIDeviceOrientationDidChangeNotification object:nil];
         // Mo panel ngay + chay dump neu bat tu dong.
         if (self.dE) [self sD];
-        else [self lg:@"Tự động dump: TẮT (bật trong tab Cài đặt)"];
+        else [self lg:@"Tự động dump: TẮT"];
     } @catch (NSException *e) {}
 }
 
@@ -632,7 +634,8 @@ static int cMN(const void *a, const void *b) {
 
 - (void)bP {
     CGRect screen = UIScreen.mainScreen.bounds;
-    CGSize sz = [self pS:self.sM screen:screen];
+    // Panel luon dung kich co Lon (gan full man hinh); keo grip chi scale nguyen khoi.
+    CGSize sz = CGSizeMake(screen.size.width - 16, screen.size.height - 32);
     CGFloat w = sz.width, h = sz.height;
     self.allSwitches = [NSMutableArray array];
     self.panel = [[UIView alloc] initWithFrame:CGRectMake((screen.size.width - w) / 2, (screen.size.height - h) / 2, w, h)];
@@ -659,6 +662,7 @@ static int cMN(const void *a, const void *b) {
     // Thanh tiêu đề = tay cầm kéo panel.
     CGFloat pad = 16;
     UIView *handle = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 48)];
+    handle.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     [self.panel addSubview:handle];
     UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dPn:)];
     panelPan.delegate = self;
@@ -669,13 +673,23 @@ static int cMN(const void *a, const void *b) {
     miniLogo.userInteractionEnabled = NO;
     [handle addSubview:miniLogo];
 
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 12, w, 24)];
-    title.text = [self cfgStr:@"title" def:@"Zhee Dump"]; title.font = [UIFont boldSystemFontOfSize:19]; title.textColor = UIColor.whiteColor;
-    title.textAlignment = NSTextAlignmentCenter;
-    [handle addSubview:title];
+    // Tieu de tab hien tai (kieu panel mau): icon + ten tab viet hoa, mau cam.
+    self.tabTitleIcon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"arrow.down.to.line"]];
+    self.tabTitleIcon.tintColor = [self acc];
+    self.tabTitleIcon.contentMode = UIViewContentModeScaleAspectFit;
+    self.tabTitleIcon.frame = CGRectMake(pad + 34, 12, 24, 24);
+    [handle addSubview:self.tabTitleIcon];
+    self.tabTitleLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad + 66, 11, w - pad - 66 - 48, 26)];
+    self.tabTitleLabel.text = @"DUMP";
+    self.tabTitleLabel.font = [self rF:20 w:UIFontWeightBold];
+    self.tabTitleLabel.textColor = [self acc];
+    [handle addSubview:self.tabTitleLabel];
 
     UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
     close.frame = CGRectMake(w - 40, 10, 28, 28);
+    close.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
+    [close setImage:[UIImage systemImageNamed:@"xmark"] forState:UIControlStateNormal];
+    close.tintColor = [self acc];
     [close setImage:[UIImage systemImageNamed:@"xmark.circle.fill"] forState:UIControlStateNormal];
     close.tintColor = [UIColor.whiteColor colorWithAlphaComponent:0.7];
     [close addTarget:self action:@selector(tP) forControlEvents:UIControlEventTouchUpInside];
@@ -685,6 +699,7 @@ static int cMN(const void *a, const void *b) {
     CGFloat sidebarW = (w < 500) ? 120 : 150;
     CGFloat cw = w - sidebarW - 24;
     UIView *side = [[UIView alloc] initWithFrame:CGRectMake(12, 90, sidebarW, h - 90 - 12)];
+    side.autoresizingMask = UIViewAutoresizingFlexibleHeight;
     side.backgroundColor = [UIColor colorWithWhite:0 alpha:0.25];
     side.layer.cornerRadius = 14;
     [self.panel addSubview:side];
@@ -692,25 +707,28 @@ static int cMN(const void *a, const void *b) {
     NSArray *sideTitles = @[@"Dump", @"Cài đặt", @"About"];
     NSArray *sideIcons = @[@"arrow.down.to.line", @"gearshape", @"info.circle"];
     CGFloat sideH = side.bounds.size.height;
-    // Nut sidebar tu co gian theo chieu cao panel (panel thap -> nut nho lai, khong de brand).
-    CGFloat btnH = MIN(52, MAX(36, (sideH - 42 - 16) / 3));
+    // Nut sidebar rai deu doc (kieu panel mau): icon to + nhan duoi, can giua nut.
+    CGFloat btnH = MIN(72, MAX(36, (sideH - 40 - 48) / 3));
+    CGFloat gap = MAX(12, (sideH - 3 * btnH - 40 - 16) / 4);
     for (NSInteger i = 0; i < 3; i++) {
         UIButton *b = [UIButton buttonWithType:UIButtonTypeCustom];
-        b.frame = CGRectMake(8, 8 + i * (btnH + 8), sidebarW - 16, btnH);
+        b.frame = CGRectMake(8, gap + i * (btnH + gap), sidebarW - 16, btnH);
         b.layer.cornerRadius = 12;
         b.tag = i;
         [b addTarget:self action:@selector(sideTap:) forControlEvents:UIControlEventTouchUpInside];
-        // Icon outline SF Symbols (co san cua Apple, khong tu ve) + nhan ben duoi.
-        CGFloat imgSize = (btnH >= 48) ? 22 : 18;
+        // Icon outline SF Symbols (co san cua Apple, khong tu ve) + nhan ben duoi, can giua nut.
+        CGFloat imgSize = (btnH >= 68) ? 28 : 20;
+        CGFloat labelH = (btnH >= 68) ? 20 : 16;
+        CGFloat iconY = MAX(2, (btnH - imgSize - 4 - labelH) / 2);
         UIImageView *icon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:sideIcons[i]]];
         icon.tintColor = UIColor.whiteColor;
         icon.contentMode = UIViewContentModeScaleAspectFit;
-        icon.frame = CGRectMake((sidebarW - 16 - imgSize) / 2, btnH - 14 - imgSize - 2, imgSize, imgSize);
+        icon.frame = CGRectMake((sidebarW - 16 - imgSize) / 2, iconY, imgSize, imgSize);
         icon.userInteractionEnabled = NO;
         [b addSubview:icon];
-        UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(0, btnH - 16, sidebarW - 16, 14)];
+        UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(0, iconY + imgSize + 4, sidebarW - 16, labelH)];
         lbl.text = sideTitles[i];
-        lbl.font = [UIFont boldSystemFontOfSize:12];
+        lbl.font = [self rF:(btnH >= 68) ? 17 : 14 w:UIFontWeightBold];
         lbl.textColor = UIColor.whiteColor;
         lbl.textAlignment = NSTextAlignmentCenter;
         lbl.userInteractionEnabled = NO;
@@ -719,6 +737,7 @@ static int cMN(const void *a, const void *b) {
         [self.sideButtons addObject:b];
     }
     UILabel *brand = [[UILabel alloc] initWithFrame:CGRectMake(0, sideH - 26, sidebarW, 22)];
+    brand.autoresizingMask = UIViewAutoresizingFlexibleTopMargin;
     brand.text = [self cfgStr:@"brand" def:@"Zhee Dev"]; brand.font = [UIFont boldSystemFontOfSize:14];
     brand.textColor = [self cfgColor:@"brandColor" def:[UIColor colorWithRed:1.0 green:0.84 blue:0.0 alpha:1]];
     brand.textAlignment = NSTextAlignmentCenter;
@@ -732,10 +751,11 @@ static int cMN(const void *a, const void *b) {
 
     // ---- Tab Dump ----
     self.dTab = [[UIView alloc] initWithFrame:CGRectMake(contentX, contentY, cw, contentH)];
+    self.dTab.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     BOOL wide = (cw >= 420);
     CGFloat quickH = wide ? 40 : 72;
-    CGFloat bottomY = contentH - 38;
-    CGFloat row1Y = wide ? bottomY : bottomY - 8 - 38;
+    CGFloat bottomY = contentH - 42;
+    CGFloat row1Y = wide ? bottomY : bottomY - 8 - 42;
     CGFloat exportY = bottomY;
     CGFloat statusY = row1Y - 8 - 20;
     CGFloat progY = statusY - 6 - 4;
@@ -743,7 +763,8 @@ static int cMN(const void *a, const void *b) {
     CGFloat logH = progY - 8 - logY;
     // Hang toggle nhanh: rong = 1 hang 2 toggle, hep = xep doc (dong bo voi tab Cai dat).
     UIView *quickRow = [[UIView alloc] initWithFrame:CGRectMake(pad, 0, cw - pad * 2, quickH)];
-    quickRow.backgroundColor = [UIColor colorWithWhite:1 alpha:0.06];
+    quickRow.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    quickRow.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1];
     quickRow.layer.cornerRadius = 12;
     UISwitch *qAuto = [UISwitch new];
     qAuto.on = self.dE; qAuto.tag = 1;
@@ -756,18 +777,18 @@ static int cMN(const void *a, const void *b) {
     if (wide) {
         CGFloat half = (cw - pad * 2) / 2;
         UILabel *qAutoLbl = [[UILabel alloc] initWithFrame:CGRectMake(12, 10, 110, 20)];
-        qAutoLbl.text = @"Tự động Dump"; qAutoLbl.font = [UIFont boldSystemFontOfSize:14]; qAutoLbl.textColor = UIColor.whiteColor;
+        qAutoLbl.text = @"Tự động Dump"; qAutoLbl.font = [self rF:14 w:UIFontWeightBold]; qAutoLbl.textColor = UIColor.whiteColor;
         [quickRow addSubview:qAutoLbl];
         qAuto.frame = CGRectMake(126, 5, 51, 31);
         [quickRow addSubview:qAuto];
         UILabel *qFullLbl = [[UILabel alloc] initWithFrame:CGRectMake(half + 12, 10, 110, 20)];
-        qFullLbl.text = @"Full offset"; qFullLbl.font = [UIFont boldSystemFontOfSize:14]; qFullLbl.textColor = UIColor.whiteColor;
+        qFullLbl.text = @"Full offset"; qFullLbl.font = [self rF:14 w:UIFontWeightBold]; qFullLbl.textColor = UIColor.whiteColor;
         [quickRow addSubview:qFullLbl];
         qFull.frame = CGRectMake(half + 126, 5, 51, 31);
         [quickRow addSubview:qFull];
     } else {
         UILabel *qAutoLbl = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, 140, 20)];
-        qAutoLbl.text = @"Tự động Dump"; qAutoLbl.font = [UIFont boldSystemFontOfSize:14]; qAutoLbl.textColor = UIColor.whiteColor;
+        qAutoLbl.text = @"Tự động Dump"; qAutoLbl.font = [self rF:14 w:UIFontWeightBold]; qAutoLbl.textColor = UIColor.whiteColor;
         [quickRow addSubview:qAutoLbl];
         qAuto.frame = CGRectMake(cw - pad * 2 - 51 - 12, 4, 51, 31);
         [quickRow addSubview:qAuto];
@@ -775,7 +796,7 @@ static int cMN(const void *a, const void *b) {
         qDiv.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.1];
         [quickRow addSubview:qDiv];
         UILabel *qFullLbl = [[UILabel alloc] initWithFrame:CGRectMake(12, 44, 140, 20)];
-        qFullLbl.text = @"Full offset"; qFullLbl.font = [UIFont boldSystemFontOfSize:14]; qFullLbl.textColor = UIColor.whiteColor;
+        qFullLbl.text = @"Full offset"; qFullLbl.font = [self rF:14 w:UIFontWeightBold]; qFullLbl.textColor = UIColor.whiteColor;
         [quickRow addSubview:qFullLbl];
         qFull.frame = CGRectMake(cw - pad * 2 - 51 - 12, 40, 51, 31);
         [quickRow addSubview:qFull];
@@ -784,35 +805,39 @@ static int cMN(const void *a, const void *b) {
     [self.allSwitches addObject:qFull];
     [self.dTab addSubview:quickRow];
     self.lV = [[UITextView alloc] initWithFrame:CGRectMake(pad, logY, cw - pad * 2, logH)];
+    self.lV.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.lV.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.35];
     self.lV.layer.cornerRadius = 14;
     self.lV.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.12].CGColor;
     self.lV.layer.borderWidth = 1;
     self.lV.textColor = [self cfgColor:@"logTextColor" def:[UIColor colorWithRed:0.7 green:1.0 blue:0.7 alpha:1]];
-    self.lV.font = [UIFont monospacedSystemFontOfSize:11 weight:UIFontWeightRegular];
+    self.lV.font = [UIFont monospacedSystemFontOfSize:12.5 weight:UIFontWeightRegular];
     self.lV.editable = NO;
     self.lV.selectable = YES;
     self.lV.text = @"";
     [self.dTab addSubview:self.lV];
 
     self.pBar = [[UIProgressView alloc] initWithFrame:CGRectMake(pad, progY, cw - pad * 2, 4)];
+    self.pBar.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin;
     self.pBar.progressTintColor = self.bC;
     self.pBar.trackTintColor = [UIColor colorWithWhite:1 alpha:0.15];
     self.pBar.progress = 0;
     [self.dTab addSubview:self.pBar];
 
     self.sLbl = [[UILabel alloc] initWithFrame:CGRectMake(pad, statusY, cw - pad * 2, 20)];
-    self.sLbl.font = [UIFont systemFontOfSize:13];
+    self.sLbl.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin;
+    self.sLbl.font = [self rF:13 w:UIFontWeightRegular];
     self.sLbl.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.8];
     self.sLbl.textAlignment = NSTextAlignmentCenter;
     self.sLbl.text = @"Đang chạy…";
     [self.dTab addSubview:self.sLbl];
 
     self.dBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.dBtn.autoresizingMask = UIViewAutoresizingFlexibleTopMargin;
     self.dBtn.layer.cornerRadius = 12;
-    self.dBtn.backgroundColor = [self cfgColor:@"dumpButtonColor" def:[UIColor colorWithRed:0.18 green:0.48 blue:1.0 alpha:1]];
+    self.dBtn.backgroundColor = [self cfgColor:@"dumpButtonColor" def:[self acc]];
     [self.dBtn setTitle:[self cfgStr:@"dumpButtonTitle" def:@"Dump lại"] forState:UIControlStateNormal];
-    self.dBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    self.dBtn.titleLabel.font = [self rF:16 w:UIFontWeightBold];
     [self.dBtn setImage:[UIImage systemImageNamed:@"arrow.clockwise"] forState:UIControlStateNormal];
     self.dBtn.tintColor = UIColor.whiteColor;
     self.dBtn.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
@@ -821,10 +846,11 @@ static int cMN(const void *a, const void *b) {
     [self.dTab addSubview:self.dBtn];
 
     UIButton *deleteButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    deleteButton.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleLeftMargin;
     deleteButton.layer.cornerRadius = 12;
     deleteButton.backgroundColor = [self cfgColor:@"deleteButtonColor" def:[UIColor colorWithRed:0.9 green:0.28 blue:0.3 alpha:1]];
     [deleteButton setTitle:[self cfgStr:@"deleteButtonTitle" def:@"Xóa file"] forState:UIControlStateNormal];
-    deleteButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    deleteButton.titleLabel.font = [self rF:16 w:UIFontWeightBold];
     [deleteButton setImage:[UIImage systemImageNamed:@"trash"] forState:UIControlStateNormal];
     deleteButton.tintColor = UIColor.whiteColor;
     deleteButton.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
@@ -833,10 +859,12 @@ static int cMN(const void *a, const void *b) {
     [self.dTab addSubview:deleteButton];
 
     UIButton *exportButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    exportButton.autoresizingMask = wide ? (UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleLeftMargin)
+                                         : (UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin);
     exportButton.layer.cornerRadius = 12;
     exportButton.backgroundColor = [self cfgColor:@"exportButtonColor" def:[UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1]];
     [exportButton setTitle:[self cfgStr:@"exportButtonTitle" def:@"Xuất ra Tải về"] forState:UIControlStateNormal];
-    exportButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    exportButton.titleLabel.font = [self rF:16 w:UIFontWeightBold];
     [exportButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     [exportButton setImage:[UIImage systemImageNamed:@"square.and.arrow.up"] forState:UIControlStateNormal];
     exportButton.tintColor = UIColor.whiteColor;
@@ -847,27 +875,29 @@ static int cMN(const void *a, const void *b) {
     if (wide) {
         // Rong: 1 hang 3 nut.
         CGFloat bw3 = (cw - pad * 2 - 16) / 3;
-        self.dBtn.frame = CGRectMake(pad, row1Y, bw3, 38);
-        deleteButton.frame = CGRectMake(pad + bw3 + 8, row1Y, bw3, 38);
-        exportButton.frame = CGRectMake(pad + 2 * bw3 + 16, row1Y, bw3, 38);
+        self.dBtn.frame = CGRectMake(pad, row1Y, bw3, 42);
+        deleteButton.frame = CGRectMake(pad + bw3 + 8, row1Y, bw3, 42);
+        exportButton.frame = CGRectMake(pad + 2 * bw3 + 16, row1Y, bw3, 42);
     } else {
         // Hep: 2 hang (2 + 1).
         CGFloat bw = (cw - pad * 2 - 8) / 2;
-        self.dBtn.frame = CGRectMake(pad, row1Y, bw, 38);
-        deleteButton.frame = CGRectMake(pad + bw + 8, row1Y, bw, 38);
-        exportButton.frame = CGRectMake(pad, exportY, cw - pad * 2, 38);
+        self.dBtn.frame = CGRectMake(pad, row1Y, bw, 42);
+        deleteButton.frame = CGRectMake(pad + bw + 8, row1Y, bw, 42);
+        exportButton.frame = CGRectMake(pad, exportY, cw - pad * 2, 42);
     }
     [self.panel addSubview:self.dTab];
 
     // ---- Tab Cài đặt ----
     self.sTab = [[UIView alloc] initWithFrame:CGRectMake(contentX, contentY, cw, contentH)];
+    self.sTab.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.sTab.hidden = YES;
     UIScrollView *setScroll = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, cw, contentH)];
+    setScroll.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     // Dan hang toggle de lap day panel (panel cao -> hang cao hon + can giua).
     CGFloat fill = 1.0;
-    if (contentH > 486) fill = MIN(1.4, (contentH - 114) / 372.0);
+    if (contentH > 448) fill = MIN(1.4, (contentH - 76) / 372.0);
     CGFloat rowH = 54 * fill;
-    CGFloat totalH = 6 * (rowH + 8) + 66 + 48;
+    CGFloat totalH = 6 * (rowH + 8) + 76;
     CGFloat sy = (totalH < contentH) ? (contentH - totalH) / 2 : 0;
     NSArray *toggles = @[
         @[@"Tự động Dump", @"Chạy dump ngay khi mở app", @(self.dE), @1],
@@ -888,35 +918,31 @@ static int cMN(const void *a, const void *b) {
     }
     UILabel *sizeTitle = [[UILabel alloc] initWithFrame:CGRectMake(pad, sy + 4, cw - pad * 2, 20)];
     sizeTitle.text = @"Kích thước panel";
-    sizeTitle.font = [UIFont boldSystemFontOfSize:15];
+    sizeTitle.font = [self rF:17 w:UIFontWeightSemibold];
     sizeTitle.textColor = UIColor.whiteColor;
     [setScroll addSubview:sizeTitle];
     UISegmentedControl *sizeSeg = [[UISegmentedControl alloc] initWithItems:@[@"Nhỏ", @"Vừa", @"Lớn"]];
-    sizeSeg.frame = CGRectMake(pad, sy + 28, cw - pad * 2, 30);
+    sizeSeg.frame = CGRectMake(pad, sy + 28, cw - pad * 2, 40);
     sizeSeg.selectedSegmentIndex = (self.sM == 3) ? UISegmentedControlNoSegment : self.sM;
-    sizeSeg.selectedSegmentTintColor = [UIColor colorWithWhite:1 alpha:0.22];
-    [sizeSeg setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateNormal];
-    [sizeSeg setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateSelected];
+    sizeSeg.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1];
+    sizeSeg.selectedSegmentTintColor = [self acc];
+    [sizeSeg setTitleTextAttributes:@{NSForegroundColorAttributeName: [UIColor colorWithWhite:0.6 alpha:1], NSFontAttributeName: [self rF:15 w:UIFontWeightSemibold]} forState:UIControlStateNormal];
+    [sizeSeg setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor, NSFontAttributeName: [self rF:15 w:UIFontWeightSemibold]} forState:UIControlStateSelected];
     [sizeSeg addTarget:self action:@selector(zC:) forControlEvents:UIControlEventValueChanged];
     [setScroll addSubview:sizeSeg];
-    sy += 66;
-    UILabel *setNote = [[UILabel alloc] initWithFrame:CGRectMake(pad, sy, cw - pad * 2, 40)];
-    setNote.text = @"Cài đặt lưu tự động. Tắt “Tự động Dump” rồi bấm “Dump lại” để dump tay. Kéo góc dưới-phải panel để chỉnh kích thước tùy ý.";
-    setNote.font = [UIFont systemFontOfSize:12];
-    setNote.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
-    setNote.numberOfLines = 2;
-    [setScroll addSubview:setNote];
-    sy += 48;
+    sy += 76;
     setScroll.contentSize = CGSizeMake(cw, sy);
     [self.sTab addSubview:setScroll];
     [self.panel addSubview:self.sTab];
 
     // ---- Tab About ----
     self.aTab = [[UIView alloc] initWithFrame:CGRectMake(contentX, contentY, cw, contentH)];
+    self.aTab.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.aTab.hidden = YES;
     UIScrollView *abScroll = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, cw, contentH)];
+    abScroll.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     // Can giua noi dung About khi panel cao hon noi dung (khong de khoang trong lech).
-    CGFloat ay = (contentH > 466) ? (contentH - 466) / 2 + 8 : 8;
+    CGFloat ay = (contentH > 390) ? (contentH - 390) / 2 + 8 : 8;
     UIView *bigLogo = [self zL:72];
     bigLogo.center = CGPointMake(cw / 2, ay + 36);
     [abScroll addSubview:bigLogo];
@@ -930,21 +956,21 @@ static int cMN(const void *a, const void *b) {
     ay += 80;
     UILabel *abTitle = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 26)];
     abTitle.text = [self cfgStr:@"aboutTitle" def:@"Zhee Dump"];
-    abTitle.font = [UIFont boldSystemFontOfSize:22];
+    abTitle.font = [self rF:22 w:UIFontWeightBold];
     abTitle.textColor = UIColor.whiteColor;
     abTitle.textAlignment = NSTextAlignmentCenter;
     [abScroll addSubview:abTitle];
     ay += 28;
     UILabel *abVer = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 18)];
-    abVer.text = [self cfgStr:@"aboutSubtitle" def:@"v4 • Dump offset lúc runtime"];
-    abVer.font = [UIFont systemFontOfSize:13];
+    abVer.text = [self cfgStr:@"aboutSubtitle" def:@"v4"];
+    abVer.font = [self rF:13 w:UIFontWeightRegular];
     abVer.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.65];
     abVer.textAlignment = NSTextAlignmentCenter;
     [abScroll addSubview:abVer];
     ay += 24;
     UILabel *abAuthor = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 20)];
     abAuthor.text = [self cfgStr:@"aboutAuthor" def:@"Phát triển bởi Hồ Đức Minh — Zhee Dev"];
-    abAuthor.font = [UIFont boldSystemFontOfSize:14];
+    abAuthor.font = [self rF:14 w:UIFontWeightBold];
     abAuthor.textColor = UIColor.whiteColor;
     abAuthor.textAlignment = NSTextAlignmentCenter;
     [abScroll addSubview:abAuthor];
@@ -976,7 +1002,7 @@ static int cMN(const void *a, const void *b) {
     teleBtn.layer.cornerRadius = 12;
     teleBtn.backgroundColor = [self cfgColor:@"telegramButtonColor" def:[UIColor colorWithRed:0.18 green:0.48 blue:1.0 alpha:1]];
     [teleBtn setTitle:[self cfgStr:@"telegramTitle" def:@"Telegram"] forState:UIControlStateNormal];
-    teleBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    teleBtn.titleLabel.font = [self rF:16 w:UIFontWeightBold];
     [teleBtn setImage:[UIImage systemImageNamed:@"paperplane"] forState:UIControlStateNormal];
     teleBtn.tintColor = UIColor.whiteColor;
     teleBtn.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
@@ -989,7 +1015,7 @@ static int cMN(const void *a, const void *b) {
     ghBtn.layer.cornerRadius = 12;
     ghBtn.backgroundColor = [UIColor colorWithWhite:1 alpha:0.12];
     [ghBtn setTitle:[self cfgStr:@"githubTitle" def:@"GitHub"] forState:UIControlStateNormal];
-    ghBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    ghBtn.titleLabel.font = [self rF:16 w:UIFontWeightBold];
     [ghBtn setImage:[UIImage systemImageNamed:@"link"] forState:UIControlStateNormal];
     ghBtn.tintColor = UIColor.whiteColor;
     ghBtn.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
@@ -998,41 +1024,33 @@ static int cMN(const void *a, const void *b) {
     [ghBtn addTarget:self action:@selector(openLink:) forControlEvents:UIControlEventTouchUpInside];
     [abScroll addSubview:ghBtn];
     ay += 52;
-    ay += 8;
-    UILabel *abDesc = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 60)];
-    abDesc.text = @"Dump offset ObjC / Mach-O / il2cpp lúc runtime, chạy trên mọi app. Không hook, không sửa app — chỉ đọc. Dữ liệu xuất ra Documents / Tải về.";
-    abDesc.font = [UIFont systemFontOfSize:12];
-    abDesc.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.6];
-    abDesc.numberOfLines = 3;
-    [abScroll addSubview:abDesc];
-    ay += 68;
     abScroll.contentSize = CGSizeMake(cw, ay);
     [self.aTab addSubview:abScroll];
     [self.panel addSubview:self.aTab];
 
     // Tay cam keo goc duoi-phai de resize panel.
     UIView *grip = [[UIView alloc] initWithFrame:CGRectMake(w - 30, h - 30, 30, 30)];
+    grip.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleTopMargin;
     grip.backgroundColor = [UIColor colorWithWhite:1 alpha:0.12];
     UIImageView *gripIcon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"arrow.up.left.and.arrow.down.right"]];
     gripIcon.tintColor = [UIColor.whiteColor colorWithAlphaComponent:0.7];
-    gripIcon.frame = CGRectMake(6, 6, 18, 18);
+    gripIcon.frame = CGRectMake(9, 9, 12, 12);
     [grip addSubview:gripIcon];
     [grip addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(gripPan:)]];
     [self.panel addSubview:grip];
+    // Scale nguyen khoi theo ti le da luu.
+    self.panel.transform = CGAffineTransformMakeScale(self.panelScale, self.panelScale);
 }
 
 - (UIView *)tR:(NSString *)title subtitle:(NSString *)sub sw:(UISwitch *)sw y:(CGFloat)y width:(CGFloat)w height:(CGFloat)h {
     CGFloat pad = 16;
     UIView *row = [[UIView alloc] initWithFrame:CGRectMake(pad, y, w - pad * 2, h)];
-    row.backgroundColor = [UIColor colorWithWhite:1 alpha:0.06];
+    row.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1];
     row.layer.cornerRadius = 12;
-    UILabel *t = [[UILabel alloc] initWithFrame:CGRectMake(12, (h - 34) / 2, w - pad * 2 - 24 - 60, 20)];
-    t.text = title; t.font = [UIFont boldSystemFontOfSize:15]; t.textColor = UIColor.whiteColor;
+    UILabel *t = [[UILabel alloc] initWithFrame:CGRectMake(16, (h - 22) / 2, w - pad * 2 - 91, 22)];
+    t.text = title; t.font = [self rF:17 w:UIFontWeightSemibold]; t.textColor = UIColor.whiteColor;
     [row addSubview:t];
-    UILabel *s = [[UILabel alloc] initWithFrame:CGRectMake(12, (h - 34) / 2 + 20, w - pad * 2 - 24 - 60, 16)];
-    s.text = sub; s.font = [UIFont systemFontOfSize:12]; s.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
-    [row addSubview:s];
-    sw.frame = CGRectMake(w - pad * 2 - 51 - 12, (h - 31) / 2, 51, 31);
+    sw.frame = CGRectMake(w - pad * 2 - 51 - 16, (h - 31) / 2, 51, 31);
     sw.onTintColor = [UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1];
     [row addSubview:sw];
     [self.allSwitches addObject:sw];
@@ -1043,10 +1061,10 @@ static int cMN(const void *a, const void *b) {
     CGFloat pad = 16;
     UIView *row = [[UIView alloc] initWithFrame:CGRectMake(pad, y, w - pad * 2, 26)];
     UILabel *k = [[UILabel alloc] initWithFrame:CGRectMake(0, 3, 92, 18)];
-    k.text = key; k.font = [UIFont systemFontOfSize:13]; k.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
+    k.text = key; k.font = [self rF:13 w:UIFontWeightRegular]; k.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
     [row addSubview:k];
     UILabel *v = [[UILabel alloc] initWithFrame:CGRectMake(96, 3, w - pad * 2 - 96, 18)];
-    v.text = value; v.font = [UIFont boldSystemFontOfSize:13]; v.textColor = UIColor.whiteColor;
+    v.text = value; v.font = [self rF:13 w:UIFontWeightBold]; v.textColor = UIColor.whiteColor;
     v.lineBreakMode = NSLineBreakByTruncatingMiddle;
     [row addSubview:v];
     return row;
@@ -1077,28 +1095,32 @@ static int cMN(const void *a, const void *b) {
 
 // Keo goc duoi-phai de resize panel (tha ra thi luu kich thuoc tuy chinh + dung lai layout).
 - (void)gripPan:(UIPanGestureRecognizer *)pan {
-    if (pan.state == UIGestureRecognizerStateChanged) {
-        CGPoint t = [pan translationInView:self.panel];
-        CGRect f = self.panel.frame;
-        CGRect b = UIScreen.mainScreen.bounds;
-        f.size.width = MAX(260, MIN(b.size.width - 16, f.size.width + t.x));
-        f.size.height = MAX(320, MIN(b.size.height - 32, f.size.height + t.y));
-        self.panel.frame = f;
-        [pan setTranslation:CGPointZero inView:self.panel];
+    if (pan.state == UIGestureRecognizerStateBegan) {
+        self.dragScale = self.panelScale;
+        self.dragStart = [pan locationInView:self.fW];
+    } else if (pan.state == UIGestureRecognizerStateChanged) {
+        // Keo grip -> scale nguyen khoi panel (khong doi frame, khong be layout).
+        CGPoint f = [pan locationInView:self.fW];
+        CGFloat dx = f.x - self.dragStart.x, dy = f.y - self.dragStart.y;
+        CGFloat bw = self.panel.bounds.size.width, bh = self.panel.bounds.size.height;
+        CGFloat scale = MIN((bw * self.dragScale + dx) / bw, (bh * self.dragScale + dy) / bh);
+        self.panelScale = MAX(0.6, MIN(1.0, scale));
+        self.panel.transform = CGAffineTransformMakeScale(self.panelScale, self.panelScale);
     } else if (pan.state == UIGestureRecognizerStateEnded || pan.state == UIGestureRecognizerStateCancelled) {
-        self.customW = self.panel.frame.size.width;
-        self.customH = self.panel.frame.size.height;
         self.sM = 3;
         [self sSv];
-        [self rP];
     }
 }
 
 - (void)updateSideButtons {
     for (UIButton *b in self.sideButtons) {
         BOOL sel = (b.tag == (self.dTab.hidden ? (self.sTab.hidden ? 2 : 1) : 0));
-        b.backgroundColor = sel ? [UIColor colorWithRed:0.18 green:0.48 blue:1.0 alpha:1]
-                                : [UIColor colorWithWhite:1 alpha:0.06];
+        // Kieu panel mau: tab chon -> icon + nhan mau cam, khong nen xanh; tab khac -> xam.
+        b.backgroundColor = UIColor.clearColor;
+        for (UIView *v in b.subviews) {
+            if ([v isKindOfClass:[UIImageView class]]) ((UIImageView *)v).tintColor = sel ? [self acc] : [UIColor colorWithWhite:0.6 alpha:1];
+            if ([v isKindOfClass:[UILabel class]]) ((UILabel *)v).textColor = sel ? [self acc] : [UIColor colorWithWhite:0.6 alpha:1];
+        }
     }
 }
 
@@ -1108,6 +1130,11 @@ static int cMN(const void *a, const void *b) {
     self.sTab.hidden = (i != 1);
     self.aTab.hidden = (i != 2);
     [self updateSideButtons];
+    // Doi tieu de thanh tren theo tab (kieu panel mau).
+    NSArray *tabNames = @[@"DUMP", @"CÀI ĐẶT", @"ABOUT"];
+    NSArray *tabIcons = @[@"arrow.down.to.line", @"gearshape", @"info.circle"];
+    self.tabTitleLabel.text = tabNames[i];
+    self.tabTitleIcon.image = [UIImage systemImageNamed:tabIcons[i]];
     UIView *show = (i == 0) ? self.dTab : (i == 1) ? self.sTab : self.aTab;
     show.alpha = 0;
     [UIView animateWithDuration:0.25 animations:^{ show.alpha = 1; }];
@@ -1122,6 +1149,8 @@ static int cMN(const void *a, const void *b) {
                 self.dmpCancel = YES;
                 [self lg:@"Đã hủy dump đang chạy (Tự động Dump: TẮT)"];
             }
+            // Bat Tu dong Dump -> chay dump ngay (khong can doi mo lai app).
+            if (sw.on && !self.dmp) [self sD];
             break;
         case 2: self.dO = sw.on; break;
         case 3: self.dSy = sw.on; break;
@@ -1138,8 +1167,13 @@ static int cMN(const void *a, const void *b) {
 
 - (void)zC:(UISegmentedControl *)seg {
     self.sM = seg.selectedSegmentIndex;
+    CGFloat scales[3] = {0.7, 0.85, 1.0};
+    self.panelScale = scales[self.sM];
     [self sSv];
-    [self rP];
+    // Chi scale nguyen khoi, khong dung lai panel.
+    [UIView animateWithDuration:0.25 animations:^{
+        self.panel.transform = CGAffineTransformMakeScale(self.panelScale, self.panelScale);
+    }];
 }
 
 - (void)tP {
@@ -1148,16 +1182,19 @@ static int cMN(const void *a, const void *b) {
     if (show) [self fetchCfg]; // mo panel -> lay giao dien moi nhat tren GitHub, co doi thi dung lai ngay
     if (show) {
         self.panel.alpha = 0;
-        self.panel.transform = CGAffineTransformMakeScale(0.85, 0.85);
+        self.panel.transform = CGAffineTransformMakeScale(self.panelScale * 0.85, self.panelScale * 0.85);
         [UIView animateWithDuration:0.45 delay:0 usingSpringWithDamping:0.75 initialSpringVelocity:0.6 options:0 animations:^{
             self.panel.alpha = 1;
-            self.panel.transform = CGAffineTransformIdentity;
+            self.panel.transform = CGAffineTransformMakeScale(self.panelScale, self.panelScale);
         } completion:nil];
     } else {
         [UIView animateWithDuration:0.22 animations:^{
             self.panel.alpha = 0;
-            self.panel.transform = CGAffineTransformMakeScale(0.92, 0.92);
-        } completion:^(BOOL f) { self.panel.hidden = YES; }];
+            self.panel.transform = CGAffineTransformMakeScale(self.panelScale * 0.92, self.panelScale * 0.92);
+        } completion:^(BOOL f) {
+            self.panel.transform = CGAffineTransformMakeScale(self.panelScale, self.panelScale);
+            self.panel.hidden = YES;
+        }];
     }
 }
 
@@ -1167,7 +1204,7 @@ static int cMN(const void *a, const void *b) {
     c.x += t.x; c.y += t.y;
     CGRect b = self.fW.bounds;
     CGFloat m = 60;
-    CGFloat hw = self.panel.bounds.size.width / 2, hh = self.panel.bounds.size.height / 2;
+    CGFloat hw = self.panel.bounds.size.width * self.panelScale / 2, hh = self.panel.bounds.size.height * self.panelScale / 2;
     c.x = MAX(hw - (self.panel.bounds.size.width - m), MIN(b.size.width - hw + (self.panel.bounds.size.width - m), c.x));
     c.y = MAX(hh - (self.panel.bounds.size.height - m), MIN(b.size.height - hh + (self.panel.bounds.size.height - m), c.y));
     self.panel.center = c;
