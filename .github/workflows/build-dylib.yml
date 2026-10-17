@@ -30,6 +30,7 @@ jobs:
             -isysroot "$SDK" -miphoneos-version-min=14.0 \
             -framework UIKit -framework Foundation \
             -framework Photos -framework Security \
+            -framework CoreGraphics -framework QuartzCore \
             -o ZheeTwitterDL.dylib Tweaks/ZheeTwitterDL/ZheeTwitterDL.m
           file ZheeTwitterDL.dylib
       - name: Upload artifact
