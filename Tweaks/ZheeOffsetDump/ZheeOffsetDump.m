@@ -285,6 +285,8 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, strong) UIView *autoloadView; // man hinh autoload luc moi vao app
 @property (nonatomic, assign) BOOL autoloadFinished; // autoload chay xong chua
 @property (nonatomic, assign) BOOL pendingUpdate; // co update doi sau autoload khong
+@property (nonatomic, strong) NSMutableString *logBuf; // buffer log, flush theo dot (khong noi chuoi O(n^2) tren UI)
+@property (nonatomic, assign) BOOL logFlushPending;
 @end
 
 @implementation ZDC
@@ -300,13 +302,45 @@ static int cMN(const void *a, const void *b) {
     NSString *msg = [[NSString alloc] initWithFormat:fmt arguments:ap];
     va_end(ap);
     NSLog(@"[ZDC] %@", msg);
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (!self.lV) return;
-        NSString *line = [NSString stringWithFormat:@"%@\n", msg];
-        self.lV.text = [self.lV.text stringByAppendingString:line];
-        NSRange end = NSMakeRange(self.lV.text.length, 0);
-        [self.lV scrollRangeToVisible:end];
-    });
+    // Buffer log + flush theo dot (0.1s): tranh noi chuoi O(n^2) tren UITextView lam treo UI khi log to.
+    @synchronized(self) {
+        if (!self.logBuf) self.logBuf = [NSMutableString string];
+        [self.logBuf appendFormat:@"%@\n", msg];
+        if (self.logBuf.length > 200000) {
+            [self.logBuf deleteCharactersInRange:NSMakeRange(0, self.logBuf.length - 200000)];
+        }
+        if (!self.logFlushPending) {
+            self.logFlushPending = YES;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [self flushLog];
+            });
+        }
+    }
+}
+
+// Day log buffer ra UI (1 lan / 0.1s), cat log UI giu ~100KB cuoi.
+- (void)flushLog {
+    NSString *chunk = nil;
+    @synchronized(self) {
+        self.logFlushPending = NO;
+        chunk = [self.logBuf copy];
+        [self.logBuf setString:@""];
+    }
+    if (!self.lV || chunk.length == 0) return;
+    UIFont *font = self.lV.font ?: [UIFont monospacedSystemFontOfSize:12.5 weight:UIFontWeightRegular];
+    UIColor *color = self.lV.textColor ?: [UIColor colorWithRed:0.7 green:1.0 blue:0.7 alpha:1];
+    [self.lV.textStorage beginEditing];
+    [self.lV.textStorage appendAttributedString:[[NSAttributedString alloc] initWithString:chunk attributes:@{NSFontAttributeName: font, NSForegroundColorAttributeName: color}]];
+    if (self.lV.textStorage.length > 100000) {
+        // Cat tu dau toi het dong dau tien sau moc 100KB (giu nguyen dong).
+        NSString *full = self.lV.textStorage.string;
+        NSUInteger cut = full.length - 100000;
+        NSRange nl = [full rangeOfString:@"\n" options:0 range:NSMakeRange(cut, full.length - cut)];
+        NSUInteger delEnd = (nl.location != NSNotFound) ? nl.location + 1 : cut;
+        [self.lV.textStorage deleteCharactersInRange:NSMakeRange(0, delEnd)];
+    }
+    [self.lV.textStorage endEditing];
+    [self.lV scrollRangeToVisible:NSMakeRange(self.lV.textStorage.length, 0)];
 }
 
 - (void)sS:(NSString *)s {
@@ -1384,8 +1418,9 @@ static int cMN(const void *a, const void *b) {
 }
 
 - (void)dA {
-    if (self.dmp) return;
+    if (self.dmp) { [self lg:@"Dump đang chạy, đợi xong đã"]; return; }
     dispatch_async(dispatch_get_main_queue(), ^{ self.lV.text = @""; });
+    @synchronized(self) { [self.logBuf setString:@""]; }
     [self sD];
 }
 
