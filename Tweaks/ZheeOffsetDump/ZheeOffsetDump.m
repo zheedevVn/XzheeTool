@@ -281,6 +281,7 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, strong) UIImageView *tabTitleIcon;
 @property (nonatomic, assign) BOOL cfgChecked; // da kiem tra panel.json lan dau chua
 @property (nonatomic, assign) BOOL userClosedPanel; // user vua dong panel
+@property (nonatomic, assign) UIBackgroundTaskIdentifier bgTask; // task giu dump chay khi app ra nen
 @end
 
 @implementation ZDC
@@ -1228,11 +1229,23 @@ static int cMN(const void *a, const void *b) {
 // ---------------------------------------------------------------------------
 // Dump
 // ---------------------------------------------------------------------------
+// Ket thuc background task (dump xong / bi huy / het gio).
+- (void)endBgTask {
+    if (self.bgTask != UIBackgroundTaskInvalid) {
+        [UIApplication.sharedApplication endBackgroundTask:self.bgTask];
+        self.bgTask = UIBackgroundTaskInvalid;
+    }
+}
+
 - (void)sD {
     if (self.dmp) return;
     self.dmp = YES;
     self.dmpCancel = NO;
     self.iDone = NO;
+    // Xin background task: an panel / app ra nen van dump tiep (iOS cho them gio, het gio thi tam dung).
+    self.bgTask = [UIApplication.sharedApplication beginBackgroundTaskWithExpirationHandler:^{
+        [self endBgTask];
+    }];
     [self sS:@"Đang chạy…"];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0), ^{
         @try {
@@ -1250,6 +1263,7 @@ static int cMN(const void *a, const void *b) {
             [self sS:@"Lỗi"];
         }
         self.dmp = NO;
+        [self endBgTask];
     });
 }
 
