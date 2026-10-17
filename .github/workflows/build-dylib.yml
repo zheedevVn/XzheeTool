@@ -1,0 +1,39 @@
+# Build ZheeTwitterDL.dylib (tweak tải video X về Ảnh) trên runner macOS.
+# Chạy khi push vào Tweaks/ZheeTwitterDL/** hoặc bấm Run workflow tay.
+# Kết quả: artifact "ZheeTwitterDL.dylib".
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Tweaks/ZheeTwitterDL/**"
+      - ".github/workflows/build-dylib.yml"
+  pull_request:
+    paths:
+      - "Tweaks/ZheeTwitterDL/**"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-dylib:
+    runs-on: xcode-27
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Configure Xcode
+        uses: ./.github/actions/configure-xcode
+      - name: Build dylib
+        run: |
+          set -euo pipefail
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          xcrun -sdk iphoneos clang -arch arm64 -dynamiclib -fobjc-arc \
+            -isysroot "$SDK" -miphoneos-version-min=14.0 \
+            -framework UIKit -framework Foundation \
+            -framework Photos -framework Security \
+            -o ZheeTwitterDL.dylib Tweaks/ZheeTwitterDL/ZheeTwitterDL.m
+          file ZheeTwitterDL.dylib
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZheeTwitterDL.dylib
+          path: ZheeTwitterDL.dylib
