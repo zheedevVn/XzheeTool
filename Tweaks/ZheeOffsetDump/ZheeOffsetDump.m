@@ -571,7 +571,7 @@ static int cMN(const void *a, const void *b) {
         self.fW.rootViewController = host;
 
         self.fB = [UIButton buttonWithType:UIButtonTypeCustom];
-        self.fB.frame = CGRectMake(screen.size.width - size - 16, screen.size.height / 2 - size / 2, size, size);
+        self.fB.frame = CGRectMake(screen.size.width - size, screen.size.height / 2 - size / 2, size, size);
         self.fB.layer.cornerRadius = size / 2;
         self.fB.backgroundColor = [UIColor colorWithRed:0.04 green:0.04 blue:0.09 alpha:1];
         self.fB.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.25].CGColor;
@@ -638,8 +638,16 @@ static int cMN(const void *a, const void *b) {
     CGRect b = self.fW.bounds;
     CGFloat r = 28;
     c.x = MAX(r, MIN(b.size.width - r, c.x));
-    c.y = MAX(r + 40, MIN(b.size.height - r - 40, c.y));
-    self.fB.center = c;
+    c.y = MAX(r + 4, MIN(b.size.height - r - 4, c.y)); // cho len sat mep tren/duoi (chi chua 4pt)
+    if (pan.state == UIGestureRecognizerStateEnded || pan.state == UIGestureRecognizerStateCancelled) {
+        // Tha ra -> dinh vao mep trai/phai gan nhat (kieu AssistiveTouch).
+        CGFloat targetX = (c.x < b.size.width / 2) ? r : b.size.width - r;
+        [UIView animateWithDuration:0.2 animations:^{
+            self.fB.center = CGPointMake(targetX, c.y);
+        }];
+    } else {
+        self.fB.center = c;
+    }
     [pan setTranslation:CGPointZero inView:self.fW];
 }
 
