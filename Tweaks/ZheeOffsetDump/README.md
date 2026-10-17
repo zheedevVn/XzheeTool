@@ -6,18 +6,24 @@ Chạy trên mọi app (không hardcode bundle ID).
 
 ## Panel
 
-Nút nổi logo Z (kéo thả) → panel gần full màn hình, sidebar trái
-(Dump | Cài đặt | About, nút đang chọn nền xanh) + nội dung bên phải,
-mở app là tự chạy dump:
+Nút nổi logo Z (kéo thả) → panel gần full màn hình, nền gần đục,
+sidebar trái (icon outline SF Symbols + nhãn, nút đang chọn nền xanh)
++ nội dung bên phải, mở app là tự chạy dump:
 
-- **Dump**: toggle nhanh (Tự động Dump + Full offset) + log live có viền +
-  thanh tiến trình + nút Dump lại (xanh) / Xóa file (đỏ) / Xuất ra Tải về (xanh lá).
+- **Dump**: toggle nhanh (Tự động Dump + Full offset, màn hình rộng xếp
+  1 hàng, hẹp xếp chồng) + log to lấp đầy + thanh tiến trình +
+  nút Dump lại (xanh, icon `arrow.clockwise`) / Xóa file (đỏ, icon `trash`) /
+  Xuất ra Tải về (xanh lá, icon `square.and.arrow.up`). Màn hình rộng:
+  3 nút 1 hàng; hẹp: 2 hàng. Tắt “Tự động Dump” giữa chừng sẽ hủy
+  luôn dump đang chạy.
 - **Cài đặt**: toggle từng phần (Tự động Dump, ObjC, Symbols, il2cpp,
-  Xuất file gốc, **Full offset**, switch xanh lá khi bật), chọn kích thước
-  panel (Nhỏ / Vừa / Lớn). Cài đặt lưu tự động. Kéo góc dưới-phải panel
-  để chỉnh kích thước tùy ý.
-- **About**: logo, tác giả Hồ Đức Minh — Zhee Dev, info app (bundle ID,
-  phiên bản, thiết bị, iOS), nút Telegram (xanh) + GitHub bấm được.
+  Xuất file gốc, **Full offset**, switch xanh lá khi bật), hàng toggle
+  tự dãn lấp đầy panel, chọn kích thước panel (Nhỏ / Vừa / Lớn).
+  Cài đặt lưu tự động. Kéo góc dưới-phải panel để chỉnh kích thước tùy ý.
+- **About**: avatar GitHub của tác giả (tải từ `github.com/zheedevVn.png`,
+  cache ở tmp, lỗi mạng thì hiện logo Z), tác giả Hồ Đức Minh — Zhee Dev,
+  info app (bundle ID, phiên bản, thiết bị, iOS), nút Telegram (xanh, icon
+  `paperplane`) + GitHub (icon `link`) bấm được.
 
 Panel tự dựng lại khi xoay ngang/dọc.
 

@@ -264,6 +264,7 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, strong) UIView *aTab;
 @property (nonatomic, strong) UIProgressView *pBar;
 @property (nonatomic, assign) BOOL dmp;
+@property (nonatomic, assign) BOOL dmpCancel;
 @property (nonatomic, assign) BOOL iDone;
 // Cai dat (luu UserDefaults, prefix zheedump.)
 @property (nonatomic, assign) BOOL dE;   // tu dong dump khi mo app
@@ -477,6 +478,12 @@ static int cMN(const void *a, const void *b) {
     blur.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [self.panel addSubview:blur];
 
+    // Lop nen gan duc (panel mau sac, khong bi game phia sau lam duc mau).
+    UIView *dim = [[UIView alloc] initWithFrame:self.panel.bounds];
+    dim.backgroundColor = [UIColor colorWithRed:0.05 green:0.05 blue:0.08 alpha:0.96];
+    dim.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self.panel addSubview:dim];
+
     // Thanh tiêu đề = tay cầm kéo panel.
     CGFloat pad = 16;
     UIView *handle = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 48)];
@@ -511,21 +518,39 @@ static int cMN(const void *a, const void *b) {
     [self.panel addSubview:side];
     self.sideButtons = [NSMutableArray array];
     NSArray *sideTitles = @[@"Dump", @"Cài đặt", @"About"];
+    NSArray *sideIcons = @[@"arrow.down.to.line", @"gearshape", @"info.circle"];
+    CGFloat sideH = side.bounds.size.height;
+    // Nut sidebar tu co gian theo chieu cao panel (panel thap -> nut nho lai, khong de brand).
+    CGFloat btnH = MIN(52, MAX(36, (sideH - 42 - 16) / 3));
     for (NSInteger i = 0; i < 3; i++) {
         UIButton *b = [UIButton buttonWithType:UIButtonTypeCustom];
-        b.frame = CGRectMake(8, 8 + i * 56, sidebarW - 16, 48);
+        b.frame = CGRectMake(8, 8 + i * (btnH + 8), sidebarW - 16, btnH);
         b.layer.cornerRadius = 12;
-        [b setTitle:sideTitles[i] forState:UIControlStateNormal];
-        b.titleLabel.font = [UIFont boldSystemFontOfSize:15];
         b.tag = i;
         [b addTarget:self action:@selector(sideTap:) forControlEvents:UIControlEventTouchUpInside];
+        // Icon outline SF Symbols (co san cua Apple, khong tu ve) + nhan ben duoi.
+        CGFloat imgSize = (btnH >= 48) ? 22 : 18;
+        UIImageView *icon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:sideIcons[i]]];
+        icon.tintColor = UIColor.whiteColor;
+        icon.contentMode = UIViewContentModeScaleAspectFit;
+        icon.frame = CGRectMake((sidebarW - 16 - imgSize) / 2, btnH - 14 - imgSize - 2, imgSize, imgSize);
+        icon.userInteractionEnabled = NO;
+        [b addSubview:icon];
+        UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(0, btnH - 16, sidebarW - 16, 14)];
+        lbl.text = sideTitles[i];
+        lbl.font = [UIFont boldSystemFontOfSize:12];
+        lbl.textColor = UIColor.whiteColor;
+        lbl.textAlignment = NSTextAlignmentCenter;
+        lbl.userInteractionEnabled = NO;
+        [b addSubview:lbl];
         [side addSubview:b];
         [self.sideButtons addObject:b];
     }
-    UILabel *brand = [[UILabel alloc] initWithFrame:CGRectMake(0, side.bounds.size.height - 30, sidebarW, 22)];
+    UILabel *brand = [[UILabel alloc] initWithFrame:CGRectMake(0, sideH - 26, sidebarW, 22)];
     brand.text = @"Zhee Dev"; brand.font = [UIFont boldSystemFontOfSize:14];
-    brand.textColor = [UIColor colorWithRed:0.85 green:1.0 blue:0.2 alpha:1];
+    brand.textColor = [UIColor colorWithRed:1.0 green:0.84 blue:0.0 alpha:1];
     brand.textAlignment = NSTextAlignmentCenter;
+    brand.hidden = (sideH - 26 < 8 + 3 * (btnH + 8) + 8);
     [side addSubview:brand];
     [self updateSideButtons];
 
@@ -535,40 +560,58 @@ static int cMN(const void *a, const void *b) {
 
     // ---- Tab Dump ----
     self.dTab = [[UIView alloc] initWithFrame:CGRectMake(contentX, contentY, cw, contentH)];
-    CGFloat exportY = contentH - 38;
-    CGFloat row1Y = exportY - 8 - 38;
+    BOOL wide = (cw >= 420);
+    CGFloat quickH = wide ? 40 : 72;
+    CGFloat bottomY = contentH - 38;
+    CGFloat row1Y = wide ? bottomY : bottomY - 8 - 38;
+    CGFloat exportY = bottomY;
     CGFloat statusY = row1Y - 8 - 20;
     CGFloat progY = statusY - 6 - 4;
-    CGFloat logH = progY - 8 - 80;
-    // Hang toggle nhanh: Tu dong Dump + Full offset (xep doc, dong bo voi tab Cai dat).
-    UIView *quickRow = [[UIView alloc] initWithFrame:CGRectMake(pad, 0, cw - pad * 2, 72)];
+    CGFloat logY = quickH + 8;
+    CGFloat logH = progY - 8 - logY;
+    // Hang toggle nhanh: rong = 1 hang 2 toggle, hep = xep doc (dong bo voi tab Cai dat).
+    UIView *quickRow = [[UIView alloc] initWithFrame:CGRectMake(pad, 0, cw - pad * 2, quickH)];
     quickRow.backgroundColor = [UIColor colorWithWhite:1 alpha:0.06];
     quickRow.layer.cornerRadius = 12;
-    UILabel *qAutoLbl = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, 140, 20)];
-    qAutoLbl.text = @"Tự động Dump"; qAutoLbl.font = [UIFont boldSystemFontOfSize:14]; qAutoLbl.textColor = UIColor.whiteColor;
-    [quickRow addSubview:qAutoLbl];
     UISwitch *qAuto = [UISwitch new];
-    qAuto.frame = CGRectMake(cw - pad * 2 - 51 - 12, 4, 51, 31);
     qAuto.on = self.dE; qAuto.tag = 1;
     qAuto.onTintColor = [UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1];
     [qAuto addTarget:self action:@selector(sC:) forControlEvents:UIControlEventValueChanged];
-    [quickRow addSubview:qAuto];
-    [self.allSwitches addObject:qAuto];
-    UIView *qDiv = [[UIView alloc] initWithFrame:CGRectMake(12, 36, cw - pad * 2 - 24, 1)];
-    qDiv.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.1];
-    [quickRow addSubview:qDiv];
-    UILabel *qFullLbl = [[UILabel alloc] initWithFrame:CGRectMake(12, 44, 140, 20)];
-    qFullLbl.text = @"Full offset"; qFullLbl.font = [UIFont boldSystemFontOfSize:14]; qFullLbl.textColor = UIColor.whiteColor;
-    [quickRow addSubview:qFullLbl];
     UISwitch *qFull = [UISwitch new];
-    qFull.frame = CGRectMake(cw - pad * 2 - 51 - 12, 40, 51, 31);
     qFull.on = self.dFu; qFull.tag = 6;
     qFull.onTintColor = [UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1];
     [qFull addTarget:self action:@selector(sC:) forControlEvents:UIControlEventValueChanged];
-    [quickRow addSubview:qFull];
+    if (wide) {
+        CGFloat half = (cw - pad * 2) / 2;
+        UILabel *qAutoLbl = [[UILabel alloc] initWithFrame:CGRectMake(12, 10, 110, 20)];
+        qAutoLbl.text = @"Tự động Dump"; qAutoLbl.font = [UIFont boldSystemFontOfSize:14]; qAutoLbl.textColor = UIColor.whiteColor;
+        [quickRow addSubview:qAutoLbl];
+        qAuto.frame = CGRectMake(126, 5, 51, 31);
+        [quickRow addSubview:qAuto];
+        UILabel *qFullLbl = [[UILabel alloc] initWithFrame:CGRectMake(half + 12, 10, 110, 20)];
+        qFullLbl.text = @"Full offset"; qFullLbl.font = [UIFont boldSystemFontOfSize:14]; qFullLbl.textColor = UIColor.whiteColor;
+        [quickRow addSubview:qFullLbl];
+        qFull.frame = CGRectMake(half + 126, 5, 51, 31);
+        [quickRow addSubview:qFull];
+    } else {
+        UILabel *qAutoLbl = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, 140, 20)];
+        qAutoLbl.text = @"Tự động Dump"; qAutoLbl.font = [UIFont boldSystemFontOfSize:14]; qAutoLbl.textColor = UIColor.whiteColor;
+        [quickRow addSubview:qAutoLbl];
+        qAuto.frame = CGRectMake(cw - pad * 2 - 51 - 12, 4, 51, 31);
+        [quickRow addSubview:qAuto];
+        UIView *qDiv = [[UIView alloc] initWithFrame:CGRectMake(12, 36, cw - pad * 2 - 24, 1)];
+        qDiv.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.1];
+        [quickRow addSubview:qDiv];
+        UILabel *qFullLbl = [[UILabel alloc] initWithFrame:CGRectMake(12, 44, 140, 20)];
+        qFullLbl.text = @"Full offset"; qFullLbl.font = [UIFont boldSystemFontOfSize:14]; qFullLbl.textColor = UIColor.whiteColor;
+        [quickRow addSubview:qFullLbl];
+        qFull.frame = CGRectMake(cw - pad * 2 - 51 - 12, 40, 51, 31);
+        [quickRow addSubview:qFull];
+    }
+    [self.allSwitches addObject:qAuto];
     [self.allSwitches addObject:qFull];
     [self.dTab addSubview:quickRow];
-    self.lV = [[UITextView alloc] initWithFrame:CGRectMake(pad, 80, cw - pad * 2, logH)];
+    self.lV = [[UITextView alloc] initWithFrame:CGRectMake(pad, logY, cw - pad * 2, logH)];
     self.lV.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.35];
     self.lV.layer.cornerRadius = 14;
     self.lV.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.12].CGColor;
@@ -594,40 +637,66 @@ static int cMN(const void *a, const void *b) {
     [self.dTab addSubview:self.sLbl];
 
     self.dBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    CGFloat bw = (cw - pad * 2 - 8) / 2;
-    self.dBtn.frame = CGRectMake(pad, row1Y, bw, 38);
     self.dBtn.layer.cornerRadius = 12;
     self.dBtn.backgroundColor = [UIColor colorWithRed:0.18 green:0.48 blue:1.0 alpha:1];
     [self.dBtn setTitle:@"Dump lại" forState:UIControlStateNormal];
     self.dBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [self.dBtn setImage:[UIImage systemImageNamed:@"arrow.clockwise"] forState:UIControlStateNormal];
+    self.dBtn.tintColor = UIColor.whiteColor;
+    self.dBtn.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
+    self.dBtn.titleEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -6);
     [self.dBtn addTarget:self action:@selector(dA) forControlEvents:UIControlEventTouchUpInside];
     [self.dTab addSubview:self.dBtn];
 
     UIButton *deleteButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    deleteButton.frame = CGRectMake(pad + bw + 8, row1Y, bw, 38);
     deleteButton.layer.cornerRadius = 12;
     deleteButton.backgroundColor = [UIColor colorWithRed:0.9 green:0.28 blue:0.3 alpha:1];
     [deleteButton setTitle:@"Xóa file" forState:UIControlStateNormal];
     deleteButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [deleteButton setImage:[UIImage systemImageNamed:@"trash"] forState:UIControlStateNormal];
+    deleteButton.tintColor = UIColor.whiteColor;
+    deleteButton.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
+    deleteButton.titleEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -6);
     [deleteButton addTarget:self action:@selector(dF) forControlEvents:UIControlEventTouchUpInside];
     [self.dTab addSubview:deleteButton];
 
     UIButton *exportButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    exportButton.frame = CGRectMake(pad, exportY, cw - pad * 2, 38);
     exportButton.layer.cornerRadius = 12;
     exportButton.backgroundColor = [UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1];
     [exportButton setTitle:@"Xuất ra Tải về" forState:UIControlStateNormal];
     exportButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [exportButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    [exportButton setImage:[UIImage systemImageNamed:@"square.and.arrow.up"] forState:UIControlStateNormal];
+    exportButton.tintColor = UIColor.whiteColor;
+    exportButton.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
+    exportButton.titleEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -6);
     [exportButton addTarget:self action:@selector(eF) forControlEvents:UIControlEventTouchUpInside];
     [self.dTab addSubview:exportButton];
+    if (wide) {
+        // Rong: 1 hang 3 nut.
+        CGFloat bw3 = (cw - pad * 2 - 16) / 3;
+        self.dBtn.frame = CGRectMake(pad, row1Y, bw3, 38);
+        deleteButton.frame = CGRectMake(pad + bw3 + 8, row1Y, bw3, 38);
+        exportButton.frame = CGRectMake(pad + 2 * bw3 + 16, row1Y, bw3, 38);
+    } else {
+        // Hep: 2 hang (2 + 1).
+        CGFloat bw = (cw - pad * 2 - 8) / 2;
+        self.dBtn.frame = CGRectMake(pad, row1Y, bw, 38);
+        deleteButton.frame = CGRectMake(pad + bw + 8, row1Y, bw, 38);
+        exportButton.frame = CGRectMake(pad, exportY, cw - pad * 2, 38);
+    }
     [self.panel addSubview:self.dTab];
 
     // ---- Tab Cài đặt ----
     self.sTab = [[UIView alloc] initWithFrame:CGRectMake(contentX, contentY, cw, contentH)];
     self.sTab.hidden = YES;
     UIScrollView *setScroll = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, cw, contentH)];
-    CGFloat sy = 0;
+    // Dan hang toggle de lap day panel (panel cao -> hang cao hon + can giua).
+    CGFloat fill = 1.0;
+    if (contentH > 486) fill = MIN(1.4, (contentH - 114) / 372.0);
+    CGFloat rowH = 54 * fill;
+    CGFloat totalH = 6 * (rowH + 8) + 66 + 48;
+    CGFloat sy = (totalH < contentH) ? (contentH - totalH) / 2 : 0;
     NSArray *toggles = @[
         @[@"Tự động Dump", @"Chạy dump ngay khi mở app", @(self.dE), @1],
         @[@"Dump ObjC", @"Class / method ObjC theo image", @(self.dO), @2],
@@ -641,9 +710,9 @@ static int cMN(const void *a, const void *b) {
         sw.on = [t[2] boolValue];
         sw.tag = [t[3] integerValue];
         [sw addTarget:self action:@selector(sC:) forControlEvents:UIControlEventValueChanged];
-        UIView *row = [self tR:t[0] subtitle:t[1] sw:sw y:sy width:cw];
+        UIView *row = [self tR:t[0] subtitle:t[1] sw:sw y:sy width:cw height:rowH];
         [setScroll addSubview:row];
-        sy += 62;
+        sy += rowH + 8;
     }
     UILabel *sizeTitle = [[UILabel alloc] initWithFrame:CGRectMake(pad, sy + 4, cw - pad * 2, 20)];
     sizeTitle.text = @"Kích thước panel";
@@ -674,10 +743,18 @@ static int cMN(const void *a, const void *b) {
     self.aTab = [[UIView alloc] initWithFrame:CGRectMake(contentX, contentY, cw, contentH)];
     self.aTab.hidden = YES;
     UIScrollView *abScroll = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, cw, contentH)];
-    CGFloat ay = 8;
+    // Can giua noi dung About khi panel cao hon noi dung (khong de khoang trong lech).
+    CGFloat ay = (contentH > 466) ? (contentH - 466) / 2 + 8 : 8;
     UIView *bigLogo = [self zL:72];
     bigLogo.center = CGPointMake(cw / 2, ay + 36);
     [abScroll addSubview:bigLogo];
+    // Avatar GitHub cua tac gia (tai tu github.com/zheedevVn.png, cache o tmp, loi -> hien logo Z).
+    UIImageView *avatar = [[UIImageView alloc] initWithFrame:CGRectMake((cw - 72) / 2, ay, 72, 72)];
+    avatar.layer.cornerRadius = 36;
+    avatar.clipsToBounds = YES;
+    avatar.contentMode = UIViewContentModeScaleAspectFill;
+    [abScroll addSubview:avatar];
+    [self loadAvatarInto:avatar];
     ay += 80;
     UILabel *abTitle = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 26)];
     abTitle.text = @"Zhee Dump";
@@ -728,6 +805,10 @@ static int cMN(const void *a, const void *b) {
     teleBtn.backgroundColor = [UIColor colorWithRed:0.18 green:0.48 blue:1.0 alpha:1];
     [teleBtn setTitle:@"Telegram" forState:UIControlStateNormal];
     teleBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [teleBtn setImage:[UIImage systemImageNamed:@"paperplane"] forState:UIControlStateNormal];
+    teleBtn.tintColor = UIColor.whiteColor;
+    teleBtn.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
+    teleBtn.titleEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -6);
     teleBtn.tag = 101;
     [teleBtn addTarget:self action:@selector(openLink:) forControlEvents:UIControlEventTouchUpInside];
     [abScroll addSubview:teleBtn];
@@ -737,6 +818,10 @@ static int cMN(const void *a, const void *b) {
     ghBtn.backgroundColor = [UIColor colorWithWhite:1 alpha:0.12];
     [ghBtn setTitle:@"GitHub" forState:UIControlStateNormal];
     ghBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [ghBtn setImage:[UIImage systemImageNamed:@"link"] forState:UIControlStateNormal];
+    ghBtn.tintColor = UIColor.whiteColor;
+    ghBtn.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
+    ghBtn.titleEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -6);
     ghBtn.tag = 100;
     [ghBtn addTarget:self action:@selector(openLink:) forControlEvents:UIControlEventTouchUpInside];
     [abScroll addSubview:ghBtn];
@@ -764,18 +849,18 @@ static int cMN(const void *a, const void *b) {
     [self.panel addSubview:grip];
 }
 
-- (UIView *)tR:(NSString *)title subtitle:(NSString *)sub sw:(UISwitch *)sw y:(CGFloat)y width:(CGFloat)w {
+- (UIView *)tR:(NSString *)title subtitle:(NSString *)sub sw:(UISwitch *)sw y:(CGFloat)y width:(CGFloat)w height:(CGFloat)h {
     CGFloat pad = 16;
-    UIView *row = [[UIView alloc] initWithFrame:CGRectMake(pad, y, w - pad * 2, 54)];
+    UIView *row = [[UIView alloc] initWithFrame:CGRectMake(pad, y, w - pad * 2, h)];
     row.backgroundColor = [UIColor colorWithWhite:1 alpha:0.06];
     row.layer.cornerRadius = 12;
-    UILabel *t = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, w - pad * 2 - 24 - 60, 20)];
+    UILabel *t = [[UILabel alloc] initWithFrame:CGRectMake(12, (h - 34) / 2, w - pad * 2 - 24 - 60, 20)];
     t.text = title; t.font = [UIFont boldSystemFontOfSize:15]; t.textColor = UIColor.whiteColor;
     [row addSubview:t];
-    UILabel *s = [[UILabel alloc] initWithFrame:CGRectMake(12, 29, w - pad * 2 - 24 - 60, 16)];
+    UILabel *s = [[UILabel alloc] initWithFrame:CGRectMake(12, (h - 34) / 2 + 20, w - pad * 2 - 24 - 60, 16)];
     s.text = sub; s.font = [UIFont systemFontOfSize:12]; s.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
     [row addSubview:s];
-    sw.frame = CGRectMake(w - pad * 2 - 51 - 12, (54 - 31) / 2, 51, 31);
+    sw.frame = CGRectMake(w - pad * 2 - 51 - 12, (h - 31) / 2, 51, 31);
     sw.onTintColor = [UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1];
     [row addSubview:sw];
     [self.allSwitches addObject:sw];
@@ -800,6 +885,22 @@ static int cMN(const void *a, const void *b) {
     NSString *url = (b.tag == 101) ? @"https://t.me/zheevipv1" : @"https://github.com/zheedevVn/XzheeTool";
     NSURL *u = [NSURL URLWithString:url];
     if (u) [UIApplication.sharedApplication openURL:u options:@{} completionHandler:nil];
+}
+
+// Tai avatar GitHub (github.com/zheedevVn.png) vao UIImageView, cache o tmp.
+- (void)loadAvatarInto:(UIImageView *)iv {
+    NSString *cache = [NSTemporaryDirectory() stringByAppendingPathComponent:@"zhee-avatar.png"];
+    NSData *cached = [NSData dataWithContentsOfFile:cache];
+    if (cached) { UIImage *img = [UIImage imageWithData:cached]; if (img) { iv.image = img; return; } }
+    NSURL *url = [NSURL URLWithString:@"https://github.com/zheedevVn.png"];
+    if (!url) return;
+    [[NSURLSession.sharedSession dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
+        if (!data || err) return;
+        UIImage *img = [UIImage imageWithData:data];
+        if (!img) return;
+        [data writeToFile:cache atomically:YES];
+        dispatch_async(dispatch_get_main_queue(), ^{ iv.image = img; });
+    }] resume];
 }
 
 // Keo goc duoi-phai de resize panel (tha ra thi luu kich thuoc tuy chinh + dung lai layout).
@@ -842,7 +943,14 @@ static int cMN(const void *a, const void *b) {
 
 - (void)sC:(UISwitch *)sw {
     switch (sw.tag) {
-        case 1: self.dE = sw.on; break;
+        case 1:
+            self.dE = sw.on;
+            // Tat Tu dong Dump giua chung -> huy luon dump dang chay.
+            if (!sw.on && self.dmp) {
+                self.dmpCancel = YES;
+                [self lg:@"Đã hủy dump đang chạy (Tự động Dump: TẮT)"];
+            }
+            break;
         case 2: self.dO = sw.on; break;
         case 3: self.dSy = sw.on; break;
         case 4: self.dI = sw.on; break;
@@ -959,6 +1067,7 @@ static int cMN(const void *a, const void *b) {
 - (void)sD {
     if (self.dmp) return;
     self.dmp = YES;
+    self.dmpCancel = NO;
     self.iDone = NO;
     [self sS:@"Đang chạy…"];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0), ^{
@@ -967,9 +1076,11 @@ static int cMN(const void *a, const void *b) {
                 if (attempt > 0) [self lg:@"il2cpp chưa sẵn, thử lại lần %d…", attempt + 1];
                 [self rD];
                 if (self.iDone) break;
+                if (self.dmpCancel) break;
                 if (attempt < 4) [NSThread sleepForTimeInterval:2.0];
             }
-            [self sS:@"Xong!"];
+            if (self.dmpCancel) [self sS:@"Đã hủy"];
+            else [self sS:@"Xong!"];
         } @catch (NSException *e) {
             [self lg:@"Lỗi: %@", e];
             [self sS:@"Lỗi"];
@@ -1019,6 +1130,7 @@ static int cMN(const void *a, const void *b) {
             clsCount = objc_getClassList(classes, clsCount);
             qsort(classes, (size_t)clsCount, sizeof(Class), cCN);
             for (int ci = 0; ci < clsCount; ci++) {
+                if (self.dmpCancel) break;
                 if (ci % 500 == 0) {
                     [self lg:@"ObjC: %d/%d class…", ci, clsCount];
                     [self sP:0.05f + 0.40f * (float)ci / (float)(clsCount > 0 ? clsCount : 1)];
@@ -1090,12 +1202,14 @@ static int cMN(const void *a, const void *b) {
         if (self.dO) [self lg:@"ObjC xong: %ld classes, %ld methods", totalObjCClasses, totalObjCMethods];
         else [self lg:@"ObjC: TẮT (theo cài đặt)"];
         [self sP:0.45f];
+        if (self.dmpCancel) { [self lg:@"Đã hủy dump"]; return; }
 
         // Mach-O symbols (C/C++) — mac dinh chi app bundle, Full offset = ca image.
         [out appendFormat:@"\n# --- Mach-O symbols (C/C++) - %@ ---\n", g_fullOffset ? @"ca image" : @"image trong app bundle"];
         NSString *bundlePath = NSBundle.mainBundle.bundlePath;
         if (!self.dSy) [self lg:@"Symbols: TẮT (theo cài đặt)"];
         for (uint32_t ii = 0; ii < imgCount && self.dSy; ii++) {
+            if (self.dmpCancel) break;
             [self sP:0.45f + 0.15f * (float)ii / (float)(imgCount > 0 ? imgCount : 1)];
             const char *imgNameC = _dyld_get_image_name(ii);
             if (!imgNameC) continue;
@@ -1164,6 +1278,7 @@ static int cMN(const void *a, const void *b) {
 
         // Metadata file.
         [self sP:0.60f];
+        if (self.dmpCancel) { [self lg:@"Đã hủy dump"]; return; }
         [out appendFormat:@"\n# --- metadata (global-metadata.dat) ---\n"];
         NSString *metaPath = nil;
         NSArray<NSString *> *candidates = @[
@@ -1249,6 +1364,7 @@ static int cMN(const void *a, const void *b) {
         }
 
         [self sP:0.65f];
+        if (self.dmpCancel) { [self lg:@"Đã hủy dump"]; return; }
         NSString *offsetsPath = [[self dD] stringByAppendingPathComponent:zStr(kS21, sizeof(kS21))];
         NSError *err = nil;
         [out writeToFile:offsetsPath atomically:YES encoding:NSUTF8StringEncoding error:&err];
@@ -1302,6 +1418,7 @@ static int cMN(const void *a, const void *b) {
                     const Il2CppAssembly **asms = assembliesFn(domain, &asmCount);
                     long totalClasses = 0, totalMethods = 0, totalFields = 0;
                     for (size_t ai = 0; ai < asmCount; ai++) {
+                        if (self.dmpCancel) break;
                         const Il2CppImage *img = assemblyImage(asms[ai]);
                         if (!img) continue;
                         const char *asmName = imageName ? (imageName(img) ?: "?") : "?";
@@ -1390,6 +1507,7 @@ static int cMN(const void *a, const void *b) {
             }
         }
         NSString *csPath = [[self dD] stringByAppendingPathComponent:zStr(kS20, sizeof(kS20))];
+        if (self.dmpCancel) { [self lg:@"Đã hủy dump"]; return; }
         [cs writeToFile:csPath atomically:YES encoding:NSUTF8StringEncoding error:&err];
         if (err) [self lg:@"Ghi dump.cs lỗi: %@", err];
         else [self lg:@"Đã xuất dump.cs -> %@", csPath];
