@@ -322,8 +322,8 @@ static int cMN(const void *a, const void *b) {
 // ---------------------------------------------------------------------------
 - (void)lS {
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
-    // Tu dong Dump chi tinh trong phien: vao app luon lay mac dinh tu panel.json (khong luu trang thai TAT qua lan mo sau).
-    self.dE = [self cfgBool:@"autoDumpDefault" def:YES];
+    // Tu dong Dump: doc trang thai DA LUU (tat la tat that, khong tu bat lai); chua co thi lay mac dinh tu panel.json.
+    self.dE = [d objectForKey:zStr(kS27, sizeof(kS27))] ? [d boolForKey:zStr(kS27, sizeof(kS27))] : [self cfgBool:@"autoDumpDefault" def:YES];
     self.dO = [d objectForKey:zStr(kS28, sizeof(kS28))] ? [d boolForKey:zStr(kS28, sizeof(kS28))] : [self cfgBool:@"dumpObjCDefault" def:YES];
     self.dSy = [d objectForKey:zStr(kS29, sizeof(kS29))] ? [d boolForKey:zStr(kS29, sizeof(kS29))] : [self cfgBool:@"dumpSymbolsDefault" def:YES];
     self.dI = [d objectForKey:zStr(kS30, sizeof(kS30))] ? [d boolForKey:zStr(kS30, sizeof(kS30))] : [self cfgBool:@"dumpIl2cppDefault" def:YES];
@@ -594,6 +594,7 @@ static int cMN(const void *a, const void *b) {
 
 - (void)sSv {
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    [d setBool:self.dE forKey:zStr(kS27, sizeof(kS27))];
     [d setBool:self.dO forKey:zStr(kS28, sizeof(kS28))];
     [d setBool:self.dSy forKey:zStr(kS29, sizeof(kS29))];
     [d setBool:self.dI forKey:zStr(kS30, sizeof(kS30))];
@@ -977,7 +978,7 @@ static int cMN(const void *a, const void *b) {
                                          : (UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin);
     exportButton.layer.cornerRadius = 12;
     exportButton.backgroundColor = [self cfgColor:@"exportButtonColor" def:[UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1]];
-    [exportButton setTitle:[self cfgStr:@"exportButtonTitle" def:@"Xuất ra Tải về"] forState:UIControlStateNormal];
+    [exportButton setTitle:[self cfgStr:@"exportButtonTitle" def:@"Xuất"] forState:UIControlStateNormal];
     exportButton.titleLabel.font = [self rF:16 w:UIFontWeightBold];
     [exportButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     [exportButton setImage:[UIImage systemImageNamed:@"square.and.arrow.up"] forState:UIControlStateNormal];
