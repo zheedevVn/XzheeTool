@@ -264,7 +264,7 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, strong) UIView *aTab;
 @property (nonatomic, strong) UIProgressView *pBar;
 @property (nonatomic, strong) NSDictionary *cfg; // cau hinh UI tai tu GitHub (panel.json)
-@property (nonatomic, strong) UIView *updateToast;
+@property (nonatomic, strong) UIView *updateAlert;
 @property (nonatomic, assign) BOOL dmp;
 @property (nonatomic, assign) BOOL dmpCancel;
 @property (nonatomic, assign) BOOL iDone;
@@ -380,47 +380,114 @@ static int cMN(const void *a, const void *b) {
                 // Lan dau: ap dung im lang, khong thong bao, khong thoat app.
                 if (!self.panel.hidden) [self rP];
             } else {
-                // Co phien ban giao dien moi: toast 5s roi tu thoat app, mo lai thay giao dien moi.
-                [self showUpdateToast];
+                // Co phien ban giao dien moi: alert 5s roi tu thoat app, mo lai thay giao dien moi.
+                [self showUpdateAlert];
             }
         });
     }] resume];
 }
 
-// Toast thong bao cap nhat giao dien (5s) roi tu thoat app.
-- (void)showUpdateToast {
-    if (self.updateToast) return;
-    CGFloat w = MIN(300, self.fW.bounds.size.width - 32);
-    CGFloat h = 46;
-    CGFloat top = self.fW.safeAreaInsets.top;
-    UIView *toast = [[UIView alloc] initWithFrame:CGRectMake((self.fW.bounds.size.width - w) / 2, -h, w, h)];
-    toast.layer.cornerRadius = h / 2;
-    toast.clipsToBounds = YES;
-    toast.userInteractionEnabled = NO;
-    toast.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.18].CGColor;
-    toast.layer.borderWidth = 1;
-    toast.layer.shadowColor = UIColor.blackColor.CGColor;
-    toast.layer.shadowOpacity = 0.4; toast.layer.shadowRadius = 12; toast.layer.shadowOffset = CGSizeMake(0, 4);
-    UIVisualEffectView *blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleDark]];
-    blur.frame = toast.bounds;
-    [toast addSubview:blur];
-    UIView *dim = [[UIView alloc] initWithFrame:toast.bounds];
-    dim.backgroundColor = [UIColor colorWithRed:0.1 green:0.1 blue:0.14 alpha:0.85];
-    [toast addSubview:dim];
-    UIActivityIndicatorView *spin = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
-    spin.color = UIColor.whiteColor;
-    spin.frame = CGRectMake(14, (h - 24) / 2, 24, 24);
-    [spin startAnimating];
-    [toast addSubview:spin];
-    UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(44, 0, w - 56, h)];
-    lbl.text = @"Đang cập nhật giao diện…";
-    lbl.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
-    lbl.textColor = UIColor.whiteColor;
-    [toast addSubview:lbl];
-    self.updateToast = toast;
-    [self.fW addSubview:toast];
-    [UIView animateWithDuration:0.35 delay:0 usingSpringWithDamping:0.8 initialSpringVelocity:0.5 options:0 animations:^{
-        toast.frame = CGRectMake((self.fW.bounds.size.width - w) / 2, top + 12, w, h);
+// Alert thong bao cap nhat giao dien: kinh mo sang giua man hinh,
+// avatar + vong xoay, thanh tien trinh gradient 5s, rung may 1 cai, roi tu thoat app.
+- (void)showUpdateAlert {
+    if (self.updateAlert) return;
+    // Rung may 1 cai (lay AudioServicesPlaySystemSound qua dlsym, khoi them framework).
+    static void (*vibFn)(unsigned int) = NULL;
+    static dispatch_once_t vibOnce;
+    dispatch_once(&vibOnce, ^{
+        void *h = dlopen("/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox", RTLD_NOW);
+        if (h) vibFn = (void (*)(unsigned int))dlsym(h, "AudioServicesPlaySystemSound");
+    });
+    if (vibFn) vibFn(4095); // kSystemSoundID_Vibrate
+    CGFloat w = MIN(320, self.fW.bounds.size.width - 48);
+    CGFloat h = 190;
+    CGRect fb = self.fW.bounds;
+    UIView *alert = [[UIView alloc] initWithFrame:CGRectMake((fb.size.width - w) / 2, (fb.size.height - h) / 2, w, h)];
+    alert.userInteractionEnabled = NO;
+    alert.layer.shadowColor = UIColor.blackColor.CGColor;
+    alert.layer.shadowOpacity = 0.25; alert.layer.shadowRadius = 16; alert.layer.shadowOffset = CGSizeMake(0, 8);
+    UIView *body = [[UIView alloc] initWithFrame:alert.bounds];
+    body.layer.cornerRadius = 20;
+    body.clipsToBounds = YES;
+    body.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.5].CGColor;
+    body.layer.borderWidth = 1;
+    [alert addSubview:body];
+    UIVisualEffectView *blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleLight]];
+    blur.frame = body.bounds;
+    [body addSubview:blur];
+    UIView *dim = [[UIView alloc] initWithFrame:body.bounds];
+    dim.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
+    [body addSubview:dim];
+    // Avatar + vong xoay.
+    CGFloat ax = (w - 64) / 2;
+    UIView *avatarBox = [[UIView alloc] initWithFrame:CGRectMake(ax, 18, 64, 64)];
+    avatarBox.layer.cornerRadius = 32;
+    avatarBox.clipsToBounds = YES;
+    avatarBox.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.08];
+    NSData *avData = [NSData dataWithContentsOfFile:[NSTemporaryDirectory() stringByAppendingPathComponent:@"zhee-avatar.png"]];
+    UIImage *avImg = avData ? [UIImage imageWithData:avData] : nil;
+    if (avImg) {
+        UIImageView *av = [[UIImageView alloc] initWithImage:avImg];
+        av.frame = avatarBox.bounds;
+        av.contentMode = UIViewContentModeScaleAspectFill;
+        [avatarBox addSubview:av];
+    } else {
+        [avatarBox addSubview:[self zL:64]];
+    }
+    [body addSubview:avatarBox];
+    UIView *ring = [[UIView alloc] initWithFrame:CGRectMake(ax - 4, 14, 72, 72)];
+    ring.backgroundColor = UIColor.clearColor;
+    CAShapeLayer *arc = [CAShapeLayer layer];
+    arc.frame = ring.bounds;
+    arc.fillColor = UIColor.clearColor.CGColor;
+    arc.strokeColor = [UIColor colorWithRed:0.2 green:0.6 blue:1.0 alpha:1].CGColor;
+    arc.lineWidth = 3;
+    arc.lineCap = kCALineCapRound;
+    arc.path = [UIBezierPath bezierPathWithArcCenter:CGPointMake(36, 36) radius:33 startAngle:-M_PI_2 endAngle:-M_PI_2 + M_PI * 1.2 clockwise:YES].CGPath;
+    [ring.layer addSublayer:arc];
+    CABasicAnimation *spin = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
+    spin.fromValue = @(0); spin.toValue = @(M_PI * 2); spin.duration = 1.2; spin.repeatCount = HUGE_VALF;
+    [ring.layer addAnimation:spin forKey:@"spin"];
+    [body addSubview:ring];
+    // Tieu de + phu de.
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(16, 94, w - 32, 24)];
+    title.text = @"Đang cập nhật giao diện…";
+    title.font = [UIFont boldSystemFontOfSize:17];
+    title.textColor = [UIColor colorWithWhite:0.08 alpha:1];
+    title.textAlignment = NSTextAlignmentCenter;
+    [body addSubview:title];
+    UILabel *sub = [[UILabel alloc] initWithFrame:CGRectMake(16, 120, w - 32, 18)];
+    sub.text = @"Vui lòng đợi…";
+    sub.font = [UIFont systemFontOfSize:13];
+    sub.textColor = [UIColor colorWithWhite:0.35 alpha:1];
+    sub.textAlignment = NSTextAlignmentCenter;
+    [body addSubview:sub];
+    // Thanh tien trinh gradient (chay 0 -> 100% trong 5s).
+    UIView *track = [[UIView alloc] initWithFrame:CGRectMake(20, h - 24, w - 40, 6)];
+    track.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.12];
+    track.layer.cornerRadius = 3;
+    track.clipsToBounds = YES;
+    [body addSubview:track];
+    UIView *fill = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, 6)];
+    fill.clipsToBounds = YES;
+    CAGradientLayer *grad = [CAGradientLayer layer];
+    grad.frame = CGRectMake(0, 0, w - 40, 6);
+    grad.colors = @[(id)[UIColor colorWithRed:0.2 green:0.6 blue:1.0 alpha:1].CGColor,
+                    (id)[UIColor colorWithRed:0.0 green:0.85 blue:1.0 alpha:1].CGColor,
+                    (id)[UIColor colorWithRed:0.6 green:0.3 blue:1.0 alpha:1].CGColor];
+    grad.startPoint = CGPointMake(0, 0.5); grad.endPoint = CGPointMake(1, 0.5);
+    [fill.layer addSublayer:grad];
+    [track addSubview:fill];
+    self.updateAlert = alert;
+    [self.fW addSubview:alert];
+    alert.alpha = 0;
+    alert.transform = CGAffineTransformMakeScale(0.9, 0.9);
+    [UIView animateWithDuration:0.3 delay:0 usingSpringWithDamping:0.8 initialSpringVelocity:0.5 options:0 animations:^{
+        alert.alpha = 1;
+        alert.transform = CGAffineTransformIdentity;
+    } completion:nil];
+    [UIView animateWithDuration:5 delay:0 options:UIViewAnimationOptionCurveLinear animations:^{
+        fill.frame = CGRectMake(0, 0, w - 40, 6);
     } completion:nil];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         exit(0); // thoat app, mo lai la thay giao dien moi

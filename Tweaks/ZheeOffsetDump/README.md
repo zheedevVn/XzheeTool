@@ -37,9 +37,11 @@ chữ About, avatar, giá trị mặc định của các toggle) đọc từ fil
   (timeout 5s), cache ở tmp, mất mạng thì dùng cache / mặc định cứng.
 - Sửa `panel.json` trên GitHub → lần mở app sau (hoặc mở panel),
   dylib tự tải cấu hình mới. Nếu có phiên bản giao diện mới, app hiện
-  toast “Đang cập nhật giao diện…” 5 giây rồi tự thoát — mở lại app là
-  thấy giao diện mới. **Không cần gỡ tiêm lại, không cần xóa app.**
-  Không có phiên bản mới thì mọi thứ im lặng, không hiện gì.
+  alert kính mờ giữa màn hình (avatar + vòng xoay, “Đang cập nhật
+  giao diện…”, thanh tiến trình gradient 5 giây), rung máy 1 cái rồi
+  tự thoát — mở lại app là thấy giao diện mới. **Không cần gỡ tiêm
+  lại, không cần xóa app.** Không có phiên bản mới thì mọi thứ im
+  lặng, không hiện gì.
 - Giá trị người dùng đã lưu (UserDefaults) luôn ưu tiên hơn giá trị
   mặc định trong `panel.json`.
 
