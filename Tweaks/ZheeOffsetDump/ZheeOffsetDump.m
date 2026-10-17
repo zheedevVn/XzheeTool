@@ -279,6 +279,8 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, strong) NSMutableArray<UISwitch *> *allSwitches;
 @property (nonatomic, strong) UILabel *tabTitleLabel;
 @property (nonatomic, strong) UIImageView *tabTitleIcon;
+@property (nonatomic, assign) BOOL cfgChecked; // da kiem tra panel.json lan dau chua
+@property (nonatomic, assign) BOOL userClosedPanel; // user vua dong panel
 @end
 
 @implementation ZDC
@@ -353,32 +355,47 @@ static int cMN(const void *a, const void *b) {
     id obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
     if ([obj isKindOfClass:[NSDictionary class]]) self.cfg = obj;
 }
+// Giai quyet sau khi kiem tra panel.json: lan dau thi mo panel neu khong co update;
+// co update thi chi hien alert (panel giu an, khong hien truoc).
+- (void)cfgResolveWithUpdate:(BOOL)changed hadCache:(BOOL)hadCache {
+    if (!self.cfgChecked) {
+        self.cfgChecked = YES;
+        if (changed && hadCache) {
+            [self showUpdateAlert];
+        } else if (!self.userClosedPanel) {
+            self.panel.hidden = NO;
+        }
+        return;
+    }
+    // Cac lan kiem tra sau (mo panel): chi xu ly khi co update that.
+    if (!changed) return;
+    if (!hadCache) {
+        if (!self.panel.hidden) [self rP];
+    } else {
+        [self showUpdateAlert];
+    }
+}
+
 - (void)fetchCfg {
     NSDictionary *oldCfg = self.cfg ?: @{};
     BOOL hadCache = (self.cfg != nil);
     NSString *urlStr = [NSString stringWithFormat:@"https://raw.githubusercontent.com/zheedevVn/XzheeTool/main/Tweaks/ZheeOffsetDump/panel.json?t=%lld", (long long)[[NSDate date] timeIntervalSince1970]];
     NSURL *url = [NSURL URLWithString:urlStr];
-    if (!url) return;
+    if (!url) { [self cfgResolveWithUpdate:NO hadCache:hadCache]; return; }
     NSURLSessionConfiguration *conf = [NSURLSessionConfiguration defaultSessionConfiguration];
     conf.timeoutIntervalForRequest = 5;
     NSURLSession *sess = [NSURLSession sessionWithConfiguration:conf];
     [[sess dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
-        if (!data || err) return;
+        if (!data || err) { dispatch_async(dispatch_get_main_queue(), ^{ [self cfgResolveWithUpdate:NO hadCache:hadCache]; }); return; }
         id obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        if (![obj isKindOfClass:[NSDictionary class]]) return;
+        if (![obj isKindOfClass:[NSDictionary class]]) { dispatch_async(dispatch_get_main_queue(), ^{ [self cfgResolveWithUpdate:NO hadCache:hadCache]; }); return; }
         NSData *oldData = [NSJSONSerialization dataWithJSONObject:oldCfg options:0 error:nil];
         NSData *newData = [NSJSONSerialization dataWithJSONObject:obj options:0 error:nil];
-        if ([oldData isEqualToData:newData]) return; // khong doi -> im lang, khong lam gi
+        if ([oldData isEqualToData:newData]) { dispatch_async(dispatch_get_main_queue(), ^{ [self cfgResolveWithUpdate:NO hadCache:hadCache]; }); return; } // khong doi -> im lang
         [data writeToFile:[NSTemporaryDirectory() stringByAppendingPathComponent:@"zhee-panel.json"] atomically:YES];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.cfg = obj;
-            if (!hadCache) {
-                // Lan dau: ap dung im lang, khong thong bao, khong thoat app.
-                if (!self.panel.hidden) [self rP];
-            } else {
-                // Co phien ban giao dien moi: alert 5s roi tu thoat app, mo lai thay giao dien moi.
-                [self showUpdateAlert];
-            }
+            [self cfgResolveWithUpdate:YES hadCache:hadCache];
         });
     }] resume];
 }
@@ -570,6 +587,7 @@ static int cMN(const void *a, const void *b) {
         [self.fW addSubview:self.fB];
 
         [self bP];
+        self.panel.hidden = YES; // an panel san, chi hien sau khi kiem tra update xong (khong hien panel truoc alert)
         self.fW.hidden = NO;
         [self fetchCfg]; // lay panel.json moi nhat tren GitHub, co thay doi thi dung lai panel
         // Xoay ngang/doc: dung lai panel + keo nut noi vao trong man hinh.
@@ -1112,6 +1130,8 @@ static int cMN(const void *a, const void *b) {
 
 - (void)tP {
     BOOL show = self.panel.hidden;
+    if (show && !self.cfgChecked) return; // chua kiem tra update xong -> doi fetch tra ve (hien panel hoac alert update)
+    self.userClosedPanel = !show;
     self.panel.hidden = NO;
     if (show) [self fetchCfg]; // mo panel -> lay giao dien moi nhat tren GitHub, co doi thi dung lai ngay
     if (show) {
