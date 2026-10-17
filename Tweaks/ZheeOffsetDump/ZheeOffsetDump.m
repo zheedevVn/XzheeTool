@@ -66,7 +66,23 @@ static void *ZheeSym(const char *name) { return dlsym(RTLD_DEFAULT, name); }
 // ---------------------------------------------------------------------------
 // Image range
 // ---------------------------------------------------------------------------
-static BOOL ZheeImageRange(uint32_t idx, uintptr_t *outBase, uintptr_t *outEnd) {
+// Cache range cua image: tinh 1 lan moi lan dump, tim bang binary search.
+// (Ban cu goi ZheeImageRange cho MOI method -> quet lai 1342 image + parse
+// header moi lan -> treo voi app lon nhu Free Fire.)
+static uintptr_t *g_imgBase = NULL;
+static uintptr_t *g_imgEnd = NULL;
+static uint32_t *g_imgSorted = NULL; // index image, sap xep theo base tang dan
+static uint32_t g_imgCacheCount = 0;
+
+static int cmpImageBase(const void *a, const void *b) {
+    uintptr_t ba = g_imgBase[*(const uint32_t *)a];
+    uintptr_t bb = g_imgBase[*(const uint32_t *)b];
+    if (ba < bb) return -1;
+    if (ba > bb) return 1;
+    return 0;
+}
+
+static BOOL ZheeImageRangeUncached(uint32_t idx, uintptr_t *outBase, uintptr_t *outEnd) {
     const struct mach_header_64 *mh = (const struct mach_header_64 *)_dyld_get_image_header(idx);
     if (!mh) return NO;
     uintptr_t base = (uintptr_t)mh;
@@ -84,10 +100,54 @@ static BOOL ZheeImageRange(uint32_t idx, uintptr_t *outBase, uintptr_t *outEnd) 
     return YES;
 }
 
-static int ZheeImageContaining(uintptr_t p, uint32_t count) {
+static void ZheeBuildImageCache(uint32_t count) {
+    free(g_imgBase); free(g_imgEnd); free(g_imgSorted);
+    g_imgBase = NULL; g_imgEnd = NULL; g_imgSorted = NULL; g_imgCacheCount = 0;
+    if (count == 0) return;
+    g_imgBase = (uintptr_t *)malloc(sizeof(uintptr_t) * count);
+    g_imgEnd = (uintptr_t *)malloc(sizeof(uintptr_t) * count);
+    g_imgSorted = (uint32_t *)malloc(sizeof(uint32_t) * count);
+    if (!g_imgBase || !g_imgEnd || !g_imgSorted) {
+        free(g_imgBase); free(g_imgEnd); free(g_imgSorted);
+        g_imgBase = NULL; g_imgEnd = NULL; g_imgSorted = NULL;
+        return;
+    }
     for (uint32_t i = 0; i < count; i++) {
         uintptr_t b = 0, e = 0;
-        if (ZheeImageRange(i, &b, &e) && p >= b && p < e) return (int)i;
+        ZheeImageRangeUncached(i, &b, &e);
+        g_imgBase[i] = b; g_imgEnd[i] = e; g_imgSorted[i] = i;
+    }
+    qsort(g_imgSorted, count, sizeof(uint32_t), cmpImageBase);
+    g_imgCacheCount = count;
+}
+
+static BOOL ZheeImageRange(uint32_t idx, uintptr_t *outBase, uintptr_t *outEnd) {
+    if (idx < g_imgCacheCount && g_imgBase) {
+        *outBase = g_imgBase[idx];
+        *outEnd = g_imgEnd[idx];
+        return YES;
+    }
+    return ZheeImageRangeUncached(idx, outBase, outEnd);
+}
+
+static int ZheeImageContaining(uintptr_t p, uint32_t count) {
+    if (g_imgBase && count == g_imgCacheCount) {
+        int lo = 0, hi = (int)g_imgCacheCount - 1, ans = -1;
+        while (lo <= hi) {
+            int mid = (lo + hi) / 2;
+            uint32_t idx = g_imgSorted[mid];
+            if (g_imgBase[idx] <= p) { ans = mid; lo = mid + 1; }
+            else hi = mid - 1;
+        }
+        if (ans >= 0) {
+            uint32_t idx = g_imgSorted[ans];
+            if (p < g_imgEnd[idx]) return (int)idx;
+        }
+        return -1;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        uintptr_t b = 0, e = 0;
+        if (ZheeImageRangeUncached(i, &b, &e) && p >= b && p < e) return (int)i;
     }
     return -1;
 }
@@ -370,6 +430,7 @@ static int cmpMethodNames(const void *a, const void *b) {
         [self log:@"Bắt đầu dump: %@", NSBundle.mainBundle.bundleIdentifier ?: @"?"];
         [self log:@"Executable: %@", exePath];
         [self log:@"Đã load %u image", imgCount];
+        ZheeBuildImageCache(imgCount);
 
         // ---- ZheeOffsets.txt: images + ObjC + Mach-O symbols + metadata ----
         NSMutableString *out = [NSMutableString string];
@@ -395,10 +456,12 @@ static int cmpMethodNames(const void *a, const void *b) {
             clsCount = objc_getClassList(classes, clsCount);
             qsort(classes, (size_t)clsCount, sizeof(Class), cmpClassNames);
             for (int ci = 0; ci < clsCount; ci++) {
+                if (ci % 500 == 0) [self log:@"ObjC: %d/%d class…", ci, clsCount];
                 Class cls = classes[ci];
                 const char *clsName = class_getName(cls);
                 if (!clsName) continue;
                 NSMutableDictionary<NSNumber *, NSMutableString *> *buckets = [NSMutableDictionary dictionary];
+                long methodsInClass = 0;
                 for (int pass = 0; pass < 2; pass++) {
                     Class target = (pass == 0) ? cls : object_getClass(cls);
                     if (!target) continue;
@@ -420,14 +483,15 @@ static int cmpMethodNames(const void *a, const void *b) {
                                           clsName, (pass == 0 ? '-' : '+'), sel ? sel : "?",
                                           type ? type : "?",
                                           (unsigned long)addr, (unsigned long)(addr - b)];
+                        methodsInClass++;
                     }
                     free(methods);
                 }
                 if (buckets.count == 0) continue;
                 totalObjCClasses++;
+                totalObjCMethods += methodsInClass;
                 for (NSNumber *imgKey in buckets) {
                     [perImage[imgKey.intValue] appendString:buckets[imgKey]];
-                    totalObjCMethods += (long)[[buckets[imgKey] componentsSeparatedByString:@"\n"] count] - 1;
                 }
                 unsigned int icount = 0;
                 Ivar *ivars = class_copyIvarList(cls, &icount);
