@@ -1,0 +1,39 @@
+# Build ZheeOffsetDump.dylib (dump offset ObjC runtime) trên runner macOS.
+# Chạy khi push vào Tweaks/ZheeOffsetDump/** hoặc bấm Run workflow tay.
+# Kết quả: artifact "ZheeOffsetDump.dylib".
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Tweaks/ZheeOffsetDump/**"
+      - ".github/workflows/build-offsetdump.yml"
+  pull_request:
+    paths:
+      - "Tweaks/ZheeOffsetDump/**"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-dylib:
+    runs-on: xcode-27
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Configure Xcode
+        uses: ./.github/actions/configure-xcode
+      - name: Build dylib
+        run: |
+          set -euo pipefail
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          xcrun -sdk iphoneos clang -arch arm64 -dynamiclib -fobjc-arc \
+            -isysroot "$SDK" -miphoneos-version-min=14.0 \
+            -framework Foundation -framework UIKit \
+            -framework CoreGraphics -framework QuartzCore \
+            -o ZheeOffsetDump.dylib Tweaks/ZheeOffsetDump/ZheeOffsetDump.m
+          file ZheeOffsetDump.dylib
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZheeOffsetDump.dylib
+          path: ZheeOffsetDump.dylib
