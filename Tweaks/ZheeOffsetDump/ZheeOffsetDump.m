@@ -1517,6 +1517,7 @@ static int cMN(const void *a, const void *b) {
                 if (ci % 500 == 0) {
                     [self lg:@"ObjC: %d/%d class…", ci, clsCount];
                     [self sP:0.05f + 0.40f * (float)ci / (float)(clsCount > 0 ? clsCount : 1)];
+                    usleep(2000); // nhuong CPU cho game, giam lag (Full offset quet rat nhieu class)
                 }
                 Class cls = classes[ci];
                 const char *clsName = class_getName(cls);
@@ -1593,6 +1594,7 @@ static int cMN(const void *a, const void *b) {
         if (!self.dSy) [self lg:@"Symbols: TẮT (theo cài đặt)"];
         for (uint32_t ii = 0; ii < imgCount && self.dSy; ii++) {
             if (self.dmpCancel) break;
+            if (ii % 20 == 0) usleep(2000); // nhuong CPU cho game, giam lag (Full offset quet ~1000 image)
             [self sP:0.45f + 0.15f * (float)ii / (float)(imgCount > 0 ? imgCount : 1)];
             const char *imgNameC = _dyld_get_image_name(ii);
             if (!imgNameC) continue;
@@ -1637,7 +1639,7 @@ static int cMN(const void *a, const void *b) {
             const struct nlist_64 *syms = (const struct nlist_64 *)(linkBase + (symoff - linkFileoff));
             const char *strtab = (const char *)(linkBase + (stroff - linkFileoff));
             [out appendFormat:@"\n## symtab [%u] %@ (%u symbols)\n", ii, imgPath, nsyms];
-            [self lg:@"Symbol %@: %u symbols", imgPath.lastPathComponent, nsyms];
+            if (ii % 50 == 0) [self lg:@"Symbol %@: %u symbols", imgPath.lastPathComponent, nsyms]; // log thua (50 image/lan) de khoi nghet UI
             long keptSyms = 0;
             for (uint32_t si = 0; si < nsyms; si++) {
                 const struct nlist_64 *sym = &syms[si];
@@ -1654,7 +1656,7 @@ static int cMN(const void *a, const void *b) {
                                   (unsigned long long)sym->n_value,
                                   (unsigned long long)(sym->n_value - textVmaddr)];
                 keptSyms++;
-                if (keptSyms % 20000 == 0) [self lg:@"  symbol %@: %ld…", imgPath.lastPathComponent, keptSyms];
+                if (keptSyms % 20000 == 0) { [self lg:@"  symbol %@: %ld…", imgPath.lastPathComponent, keptSyms]; usleep(1000); }
             }
             [out appendFormat:@"# symtab [%u]: %ld symbols dinh nghia\n", ii, keptSyms];
         }
