@@ -27,6 +27,25 @@ sidebar trái (icon outline SF Symbols + nhãn, nút đang chọn nền xanh)
 
 Panel tự dựng lại khi xoay ngang/dọc.
 
+## Cập nhật giao diện không cần tiêm lại
+
+Dylib chỉ tiêm **1 lần**. Giao diện (tiêu đề, màu sắc, chữ nút,
+chữ About, avatar, giá trị mặc định của các toggle) đọc từ file
+`panel.json` trên GitHub mỗi lần mở app:
+
+- Dylib tải `raw.githubusercontent.com/zheedevVn/XzheeTool/main/Tweaks/ZheeOffsetDump/panel.json`
+  (timeout 5s), cache ở tmp, mất mạng thì dùng cache / mặc định cứng.
+- Sửa `panel.json` trên GitHub → lần mở app sau panel tự dựng lại
+  theo cấu hình mới (giữ nguyên log + tab đang mở), **không cần gỡ
+  tiêm lại**.
+- Giá trị người dùng đã lưu (UserDefaults) luôn ưu tiên hơn giá trị
+  mặc định trong `panel.json`.
+
+Giới hạn: chỉ đổi được giao diện + giá trị mặc định. Đổi **logic dump**
+(vd thêm loại offset mới, sửa bug quét) vẫn phải build dylib mới và
+tiêm lại — dylib mới tải về chưa được ký bằng cert của bạn nên iOS
+từ chối load (ESign), thay file trong bundle cũng hỏng chữ ký.
+
 ## Output
 
 Trong Documents của app, sau khi dump xong:

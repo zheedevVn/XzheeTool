@@ -263,6 +263,7 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, strong) UIView *sTab;
 @property (nonatomic, strong) UIView *aTab;
 @property (nonatomic, strong) UIProgressView *pBar;
+@property (nonatomic, strong) NSDictionary *cfg; // cau hinh UI tai tu GitHub (panel.json)
 @property (nonatomic, assign) BOOL dmp;
 @property (nonatomic, assign) BOOL dmpCancel;
 @property (nonatomic, assign) BOOL iDone;
@@ -283,7 +284,7 @@ static int cMN(const void *a, const void *b) {
 
 + (instancetype)sh { static ZDC *s; static dispatch_once_t t; dispatch_once(&t, ^{ s = [ZDC new]; }); return s; }
 
-- (UIColor *)bB { return [UIColor colorWithRed:0.11 green:0.63 blue:0.95 alpha:1]; }
+- (UIColor *)bB { return [self cfgColor:@"accentColor" def:[UIColor colorWithRed:0.11 green:0.63 blue:0.95 alpha:1]]; }
 - (UIColor *)bC { return [UIColor colorWithRed:0.00 green:0.82 blue:1.00 alpha:1]; }
 
 // Log live: ghi vào panel + NSLog.
@@ -314,16 +315,68 @@ static int cMN(const void *a, const void *b) {
 // ---------------------------------------------------------------------------
 - (void)lS {
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
-    self.dE = [d objectForKey:zStr(kS27, sizeof(kS27))] ? [d boolForKey:zStr(kS27, sizeof(kS27))] : YES;
-    self.dO = [d objectForKey:zStr(kS28, sizeof(kS28))] ? [d boolForKey:zStr(kS28, sizeof(kS28))] : YES;
-    self.dSy = [d objectForKey:zStr(kS29, sizeof(kS29))] ? [d boolForKey:zStr(kS29, sizeof(kS29))] : YES;
-    self.dI = [d objectForKey:zStr(kS30, sizeof(kS30))] ? [d boolForKey:zStr(kS30, sizeof(kS30))] : YES;
-    self.dER = [d objectForKey:zStr(kS31, sizeof(kS31))] ? [d boolForKey:zStr(kS31, sizeof(kS31))] : YES;
-    self.dFu = [d boolForKey:zStr(kS32, sizeof(kS32))]; // mac dinh NO: chi app bundle
-    self.sM = [d integerForKey:zStr(kS33, sizeof(kS33))]; // 0 Nho, 1 Vua, 2 Lon, 3 Tuy chinh
+    // Mac dinh lay tu panel.json (GitHub) khi chua co gia tri da luu.
+    self.dE = [d objectForKey:zStr(kS27, sizeof(kS27))] ? [d boolForKey:zStr(kS27, sizeof(kS27))] : [self cfgBool:@"autoDumpDefault" def:YES];
+    self.dO = [d objectForKey:zStr(kS28, sizeof(kS28))] ? [d boolForKey:zStr(kS28, sizeof(kS28))] : [self cfgBool:@"dumpObjCDefault" def:YES];
+    self.dSy = [d objectForKey:zStr(kS29, sizeof(kS29))] ? [d boolForKey:zStr(kS29, sizeof(kS29))] : [self cfgBool:@"dumpSymbolsDefault" def:YES];
+    self.dI = [d objectForKey:zStr(kS30, sizeof(kS30))] ? [d boolForKey:zStr(kS30, sizeof(kS30))] : [self cfgBool:@"dumpIl2cppDefault" def:YES];
+    self.dER = [d objectForKey:zStr(kS31, sizeof(kS31))] ? [d boolForKey:zStr(kS31, sizeof(kS31))] : [self cfgBool:@"exportRawDefault" def:YES];
+    self.dFu = [d objectForKey:zStr(kS32, sizeof(kS32))] ? [d boolForKey:zStr(kS32, sizeof(kS32))] : [self cfgBool:@"fullOffsetDefault" def:NO];
+    self.sM = [d objectForKey:zStr(kS33, sizeof(kS33))] ? [d integerForKey:zStr(kS33, sizeof(kS33))] : MIN(2, MAX(0, [self cfgInt:@"sizeDefault" def:1]));
     if (self.sM < 0 || self.sM > 3) self.sM = 1;
     self.customW = [d doubleForKey:@"zheedump.cw"];
     self.customH = [d doubleForKey:@"zheedump.ch"];
+}
+
+// ---- Cau hinh UI tu xa (panel.json tren GitHub) ----
+- (NSString *)cfgStr:(NSString *)key def:(NSString *)def {
+    id v = self.cfg[key];
+    return [v isKindOfClass:[NSString class]] ? v : def;
+}
+- (BOOL)cfgBool:(NSString *)key def:(BOOL)def {
+    id v = self.cfg[key];
+    return [v isKindOfClass:[NSNumber class]] ? [v boolValue] : def;
+}
+- (NSInteger)cfgInt:(NSString *)key def:(NSInteger)def {
+    id v = self.cfg[key];
+    return [v isKindOfClass:[NSNumber class]] ? [v integerValue] : def;
+}
+- (UIColor *)cfgColor:(NSString *)key def:(UIColor *)def {
+    NSString *s = [self cfgStr:key def:nil];
+    if (!s) return def;
+    if ([s hasPrefix:@"#"]) s = [s substringFromIndex:1];
+    if (s.length != 6) return def;
+    unsigned int v = 0;
+    if (![[NSScanner scannerWithString:s] scanHexInt:&v]) return def;
+    return [UIColor colorWithRed:((v >> 16) & 0xFF) / 255.0 green:((v >> 8) & 0xFF) / 255.0 blue:(v & 0xFF) / 255.0 alpha:1];
+}
+- (void)loadCfgCache {
+    NSData *data = [NSData dataWithContentsOfFile:[NSTemporaryDirectory() stringByAppendingPathComponent:@"zhee-panel.json"]];
+    if (!data) return;
+    id obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    if ([obj isKindOfClass:[NSDictionary class]]) self.cfg = obj;
+}
+- (void)fetchCfg {
+    NSDictionary *oldCfg = self.cfg ?: @{};
+    NSString *urlStr = [NSString stringWithFormat:@"https://raw.githubusercontent.com/zheedevVn/XzheeTool/main/Tweaks/ZheeOffsetDump/panel.json?t=%lld", (long long)[[NSDate date] timeIntervalSince1970]];
+    NSURL *url = [NSURL URLWithString:urlStr];
+    if (!url) return;
+    NSURLSessionConfiguration *conf = [NSURLSessionConfiguration defaultSessionConfiguration];
+    conf.timeoutIntervalForRequest = 5;
+    NSURLSession *sess = [NSURLSession sessionWithConfiguration:conf];
+    [[sess dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
+        if (!data || err) return;
+        id obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        if (![obj isKindOfClass:[NSDictionary class]]) return;
+        NSData *oldData = [NSJSONSerialization dataWithJSONObject:oldCfg options:0 error:nil];
+        NSData *newData = [NSJSONSerialization dataWithJSONObject:obj options:0 error:nil];
+        if ([oldData isEqualToData:newData]) return; // khong doi -> giu nguyen panel
+        [data writeToFile:[NSTemporaryDirectory() stringByAppendingPathComponent:@"zhee-panel.json"] atomically:YES];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.cfg = obj;
+            [self rP]; // dung lai panel theo cau hinh moi (giu log + tab + trang thai an/hien)
+        });
+    }] resume];
 }
 
 - (void)sSv {
@@ -371,6 +424,7 @@ static int cMN(const void *a, const void *b) {
 - (void)st {
     @try {
         if (zDA()) return; // debugger dinh kem -> khong chay
+        [self loadCfgCache]; // cau hinh UI da cache tu lan mo truoc
         [self lS];
         UIWindowScene *scene = nil;
         for (UIScene *s in UIApplication.sharedApplication.connectedScenes) {
@@ -408,6 +462,7 @@ static int cMN(const void *a, const void *b) {
 
         [self bP];
         self.fW.hidden = NO;
+        [self fetchCfg]; // lay panel.json moi nhat tren GitHub, co thay doi thi dung lai panel
         // Xoay ngang/doc: dung lai panel + keo nut noi vao trong man hinh.
         [[UIDevice currentDevice] beginGeneratingDeviceOrientationNotifications];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(hO)
@@ -437,9 +492,11 @@ static int cMN(const void *a, const void *b) {
 - (void)rP {
     NSString *savedLog = self.lV.text ?: @"";
     NSInteger savedTab = self.dTab.hidden ? (self.sTab.hidden ? 2 : 1) : 0;
+    BOOL wasHidden = self.panel.hidden;
     [self.panel removeFromSuperview];
     self.panel = nil;
     [self bP];
+    self.panel.hidden = wasHidden;
     self.lV.text = savedLog;
     NSRange end = NSMakeRange(self.lV.text.length, 0);
     [self.lV scrollRangeToVisible:end];
@@ -498,7 +555,7 @@ static int cMN(const void *a, const void *b) {
     [handle addSubview:miniLogo];
 
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 12, w, 24)];
-    title.text = @"Zhee Dump"; title.font = [UIFont boldSystemFontOfSize:19]; title.textColor = UIColor.whiteColor;
+    title.text = [self cfgStr:@"title" def:@"Zhee Dump"]; title.font = [UIFont boldSystemFontOfSize:19]; title.textColor = UIColor.whiteColor;
     title.textAlignment = NSTextAlignmentCenter;
     [handle addSubview:title];
 
@@ -547,8 +604,8 @@ static int cMN(const void *a, const void *b) {
         [self.sideButtons addObject:b];
     }
     UILabel *brand = [[UILabel alloc] initWithFrame:CGRectMake(0, sideH - 26, sidebarW, 22)];
-    brand.text = @"Zhee Dev"; brand.font = [UIFont boldSystemFontOfSize:14];
-    brand.textColor = [UIColor colorWithRed:1.0 green:0.84 blue:0.0 alpha:1];
+    brand.text = [self cfgStr:@"brand" def:@"Zhee Dev"]; brand.font = [UIFont boldSystemFontOfSize:14];
+    brand.textColor = [self cfgColor:@"brandColor" def:[UIColor colorWithRed:1.0 green:0.84 blue:0.0 alpha:1]];
     brand.textAlignment = NSTextAlignmentCenter;
     brand.hidden = (sideH - 26 < 8 + 3 * (btnH + 8) + 8);
     [side addSubview:brand];
@@ -616,7 +673,7 @@ static int cMN(const void *a, const void *b) {
     self.lV.layer.cornerRadius = 14;
     self.lV.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.12].CGColor;
     self.lV.layer.borderWidth = 1;
-    self.lV.textColor = [UIColor colorWithRed:0.7 green:1.0 blue:0.7 alpha:1];
+    self.lV.textColor = [self cfgColor:@"logTextColor" def:[UIColor colorWithRed:0.7 green:1.0 blue:0.7 alpha:1]];
     self.lV.font = [UIFont monospacedSystemFontOfSize:11 weight:UIFontWeightRegular];
     self.lV.editable = NO;
     self.lV.selectable = YES;
@@ -638,8 +695,8 @@ static int cMN(const void *a, const void *b) {
 
     self.dBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     self.dBtn.layer.cornerRadius = 12;
-    self.dBtn.backgroundColor = [UIColor colorWithRed:0.18 green:0.48 blue:1.0 alpha:1];
-    [self.dBtn setTitle:@"Dump lại" forState:UIControlStateNormal];
+    self.dBtn.backgroundColor = [self cfgColor:@"dumpButtonColor" def:[UIColor colorWithRed:0.18 green:0.48 blue:1.0 alpha:1]];
+    [self.dBtn setTitle:[self cfgStr:@"dumpButtonTitle" def:@"Dump lại"] forState:UIControlStateNormal];
     self.dBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [self.dBtn setImage:[UIImage systemImageNamed:@"arrow.clockwise"] forState:UIControlStateNormal];
     self.dBtn.tintColor = UIColor.whiteColor;
@@ -650,8 +707,8 @@ static int cMN(const void *a, const void *b) {
 
     UIButton *deleteButton = [UIButton buttonWithType:UIButtonTypeCustom];
     deleteButton.layer.cornerRadius = 12;
-    deleteButton.backgroundColor = [UIColor colorWithRed:0.9 green:0.28 blue:0.3 alpha:1];
-    [deleteButton setTitle:@"Xóa file" forState:UIControlStateNormal];
+    deleteButton.backgroundColor = [self cfgColor:@"deleteButtonColor" def:[UIColor colorWithRed:0.9 green:0.28 blue:0.3 alpha:1]];
+    [deleteButton setTitle:[self cfgStr:@"deleteButtonTitle" def:@"Xóa file"] forState:UIControlStateNormal];
     deleteButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [deleteButton setImage:[UIImage systemImageNamed:@"trash"] forState:UIControlStateNormal];
     deleteButton.tintColor = UIColor.whiteColor;
@@ -662,8 +719,8 @@ static int cMN(const void *a, const void *b) {
 
     UIButton *exportButton = [UIButton buttonWithType:UIButtonTypeCustom];
     exportButton.layer.cornerRadius = 12;
-    exportButton.backgroundColor = [UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1];
-    [exportButton setTitle:@"Xuất ra Tải về" forState:UIControlStateNormal];
+    exportButton.backgroundColor = [self cfgColor:@"exportButtonColor" def:[UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1]];
+    [exportButton setTitle:[self cfgStr:@"exportButtonTitle" def:@"Xuất ra Tải về"] forState:UIControlStateNormal];
     exportButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [exportButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     [exportButton setImage:[UIImage systemImageNamed:@"square.and.arrow.up"] forState:UIControlStateNormal];
@@ -757,21 +814,21 @@ static int cMN(const void *a, const void *b) {
     [self loadAvatarInto:avatar];
     ay += 80;
     UILabel *abTitle = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 26)];
-    abTitle.text = @"Zhee Dump";
+    abTitle.text = [self cfgStr:@"aboutTitle" def:@"Zhee Dump"];
     abTitle.font = [UIFont boldSystemFontOfSize:22];
     abTitle.textColor = UIColor.whiteColor;
     abTitle.textAlignment = NSTextAlignmentCenter;
     [abScroll addSubview:abTitle];
     ay += 28;
     UILabel *abVer = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 18)];
-    abVer.text = @"v4 • Dump offset lúc runtime";
+    abVer.text = [self cfgStr:@"aboutSubtitle" def:@"v4 • Dump offset lúc runtime"];
     abVer.font = [UIFont systemFontOfSize:13];
     abVer.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.65];
     abVer.textAlignment = NSTextAlignmentCenter;
     [abScroll addSubview:abVer];
     ay += 24;
     UILabel *abAuthor = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 20)];
-    abAuthor.text = @"Phát triển bởi Hồ Đức Minh — Zhee Dev";
+    abAuthor.text = [self cfgStr:@"aboutAuthor" def:@"Phát triển bởi Hồ Đức Minh — Zhee Dev"];
     abAuthor.font = [UIFont boldSystemFontOfSize:14];
     abAuthor.textColor = UIColor.whiteColor;
     abAuthor.textAlignment = NSTextAlignmentCenter;
@@ -802,8 +859,8 @@ static int cMN(const void *a, const void *b) {
     UIButton *teleBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     teleBtn.frame = CGRectMake(pad, ay, abw, 44);
     teleBtn.layer.cornerRadius = 12;
-    teleBtn.backgroundColor = [UIColor colorWithRed:0.18 green:0.48 blue:1.0 alpha:1];
-    [teleBtn setTitle:@"Telegram" forState:UIControlStateNormal];
+    teleBtn.backgroundColor = [self cfgColor:@"telegramButtonColor" def:[UIColor colorWithRed:0.18 green:0.48 blue:1.0 alpha:1]];
+    [teleBtn setTitle:[self cfgStr:@"telegramTitle" def:@"Telegram"] forState:UIControlStateNormal];
     teleBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [teleBtn setImage:[UIImage systemImageNamed:@"paperplane"] forState:UIControlStateNormal];
     teleBtn.tintColor = UIColor.whiteColor;
@@ -816,7 +873,7 @@ static int cMN(const void *a, const void *b) {
     ghBtn.frame = CGRectMake(pad + abw + 8, ay, abw, 44);
     ghBtn.layer.cornerRadius = 12;
     ghBtn.backgroundColor = [UIColor colorWithWhite:1 alpha:0.12];
-    [ghBtn setTitle:@"GitHub" forState:UIControlStateNormal];
+    [ghBtn setTitle:[self cfgStr:@"githubTitle" def:@"GitHub"] forState:UIControlStateNormal];
     ghBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [ghBtn setImage:[UIImage systemImageNamed:@"link"] forState:UIControlStateNormal];
     ghBtn.tintColor = UIColor.whiteColor;
@@ -892,7 +949,7 @@ static int cMN(const void *a, const void *b) {
     NSString *cache = [NSTemporaryDirectory() stringByAppendingPathComponent:@"zhee-avatar.png"];
     NSData *cached = [NSData dataWithContentsOfFile:cache];
     if (cached) { UIImage *img = [UIImage imageWithData:cached]; if (img) { iv.image = img; return; } }
-    NSURL *url = [NSURL URLWithString:@"https://github.com/zheedevVn.png"];
+    NSURL *url = [NSURL URLWithString:[self cfgStr:@"avatarURL" def:@"https://github.com/zheedevVn.png"]];
     if (!url) return;
     [[NSURLSession.sharedSession dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
         if (!data || err) return;
@@ -973,6 +1030,7 @@ static int cMN(const void *a, const void *b) {
 - (void)tP {
     BOOL show = self.panel.hidden;
     self.panel.hidden = NO;
+    if (show) [self fetchCfg]; // mo panel -> lay giao dien moi nhat tren GitHub, co doi thi dung lai ngay
     if (show) {
         self.panel.alpha = 0;
         self.panel.transform = CGAffineTransformMakeScale(0.85, 0.85);
