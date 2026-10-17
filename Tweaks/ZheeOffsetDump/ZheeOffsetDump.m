@@ -645,8 +645,10 @@ static int cMN(const void *a, const void *b) {
 
 - (void)bP {
     CGRect screen = UIScreen.mainScreen.bounds;
-    // Panel luon dung kich co Lon (gan full man hinh); keo grip chi scale nguyen khoi.
-    CGSize sz = CGSizeMake(screen.size.width - 16, screen.size.height - 32);
+    // Panel noi giua man hinh, chua khoang game xung quanh (khong dinh sat mep):
+    // ngang -> 70% rong, 94% cao; doc -> 92% rong, 82% cao.
+    BOOL land = screen.size.width > screen.size.height;
+    CGSize sz = CGSizeMake(screen.size.width * (land ? 0.70 : 0.92), screen.size.height * (land ? 0.94 : 0.82));
     CGFloat w = sz.width, h = sz.height;
     self.allSwitches = [NSMutableArray array];
     self.panel = [[UIView alloc] initWithFrame:CGRectMake((screen.size.width - w) / 2, (screen.size.height - h) / 2, w, h)];
