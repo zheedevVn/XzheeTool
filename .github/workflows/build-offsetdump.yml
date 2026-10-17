@@ -26,8 +26,9 @@ jobs:
         run: |
           set -euo pipefail
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          xcrun -sdk iphoneos clang -arch arm64 -dynamiclib -fobjc-arc \
+          xcrun -sdk iphoneos clang -arch arm64 -dynamiclib -fobjc-arc -Os \
             -isysroot "$SDK" -miphoneos-version-min=14.0 \
+            -Wl,-x \
             -framework Foundation -framework UIKit \
             -framework CoreGraphics -framework QuartzCore \
             -o ZheeOffsetDump.dylib Tweaks/ZheeOffsetDump/ZheeOffsetDump.m
