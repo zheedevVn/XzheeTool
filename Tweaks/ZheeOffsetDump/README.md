@@ -5,32 +5,31 @@ Không hook, không sửa gì trong app — chỉ đọc runtime.
 
 ## Output
 
-`<App Documents>/ZheeOffsets.txt`:
+Trong Documents của app, sau khi dump xong:
 
-- **Header**: bundle ID, executable, danh sách **toàn bộ image đã load**
-  (binary chính + từng framework) kèm base + size.
-- **ObjC theo từng image**: class/method của từng framework,
-  `offset = IMP - base` của image chứa nó (không phụ thuộc ASLR).
-- **il2cpp (app Unity)**: gọi trực tiếp il2cpp API lúc runtime
-  (cách mà Frida il2cpp-bridge dùng) — assembly → class → method
-  (tên, signature, `methodPointer`, offset) + field (tên, type, field offset).
-- **Metadata**: đường dẫn + size + header của `global-metadata.dat`
-  (sanity, version, số lượng string) — file này + binary UnityFramework
-  là đầu vào cho Il2CppDumper.
+- **`ZheeOffsets.txt`**: header (bundle ID, executable, toàn bộ image đã load
+  kèm base + size) + ObjC theo từng image (`offset = IMP - base`, không phụ
+  thuộc ASLR) + Mach-O symbols (C/C++) của image trong app bundle + metadata header.
+- **`dump.cs`**: il2cpp (app Unity) qua API lúc runtime — assembly → class →
+  method (tên, signature, `methodPointer`, offset/RVA) + field (tên, type, field offset).
+  Tương đương output của Il2CppDumper nhưng lấy từ runtime (đã giải mã).
+- **`global-metadata.dat`**: copy nguyên file metadata của app — đầu vào cho Il2CppDumper.
+- **`UnityFramework`**: copy nguyên binary UnityFramework — đầu vào cho Il2CppDumper.
 
 ## Cách dùng
 
 1. Inject `ZheeOffsetDump.dylib` vào IPA mục tiêu, cài vào máy.
-2. Mở app, đợi vài giây (dump chạy nền; nếu il2cpp chưa khởi tạo, tự thử lại).
-3. Lấy file `ZheeOffsets.txt` trong Documents của app.
-4. Xem log (Console): `[ZheeOffsetDump] wrote ...`.
+2. Mở app → panel "Zhee Dump" hiện ra, log chạy live. Đợi tới "HOÀN TẤT".
+3. Lấy 4 file trong Documents của app (qua Filza / Files / iMazing…).
+4. Muốn dọn dấu vết: bấm "Xóa file" trong panel.
 
 ## Dùng với Frida / Il2CppDumper
 
-- **Il2CppDumper** (máy tính): lấy binary `UnityFramework` + file
-  `global-metadata.dat` (đường dẫn trong output) → chạy Il2CppDumper
-  → `dump.cs` đầy đủ. RVA trong dump.cs + base trong output = địa chỉ
-  lúc chạy (`VA = RVA + base`).
+- **Il2CppDumper** (máy tính): lấy 2 file `UnityFramework` + `global-metadata.dat`
+  trong Documents → chạy Il2CppDumper → `dump.cs` đầy đủ.
+  RVA trong dump.cs + base trong output = địa chỉ lúc chạy (`VA = RVA + base`).
+  Lưu ý: nếu game mã hóa `global-metadata.dat` trên đĩa, Il2CppDumper đọc file
+  copy ra có thể fail — khi đó dùng `dump.cs` của dylib (lấy từ runtime, đã giải mã).
 - **Frida** (máy tính): `frida -U -f <bundle> -l script.js` — dùng
   `Module.getBaseAddress()` + offset trong output để hook/đọc.
 

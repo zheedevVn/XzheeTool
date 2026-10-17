@@ -391,7 +391,9 @@ static int cmpMethodNames(const void *a, const void *b) {
     NSString *docs = [self docsDir];
     [fm removeItemAtPath:[docs stringByAppendingPathComponent:@"dump.cs"] error:nil];
     [fm removeItemAtPath:[docs stringByAppendingPathComponent:@"ZheeOffsets.txt"] error:nil];
-    [self log:@"Đã xóa file dump (dump.cs, ZheeOffsets.txt)"];
+    [fm removeItemAtPath:[docs stringByAppendingPathComponent:@"global-metadata.dat"] error:nil];
+    [fm removeItemAtPath:[docs stringByAppendingPathComponent:@"UnityFramework"] error:nil];
+    [self log:@"Đã xóa file dump (dump.cs, ZheeOffsets.txt, global-metadata.dat, UnityFramework)"];
 }
 
 // ---------------------------------------------------------------------------
@@ -635,6 +637,46 @@ static int cmpMethodNames(const void *a, const void *b) {
             [self log:@"Không tìm thấy global-metadata.dat"];
         }
 
+        // Export file goc cho Il2CppDumper tren PC: global-metadata.dat + binary UnityFramework.
+        if (metaPath) {
+            NSString *metaDest = [[self docsDir] stringByAppendingPathComponent:@"global-metadata.dat"];
+            [fm removeItemAtPath:metaDest error:nil];
+            NSError *copyErr = nil;
+            if ([fm copyItemAtPath:metaPath toPath:metaDest error:&copyErr]) {
+                [self log:@"Đã xuất global-metadata.dat -> Documents"];
+            } else {
+                [self log:@"Copy global-metadata.dat lỗi: %@", copyErr];
+            }
+        }
+        NSString *ufPath = nil;
+        NSString *ufDirect = [frameworksDir stringByAppendingPathComponent:@"UnityFramework.framework/UnityFramework"];
+        if ([fm fileExistsAtPath:ufDirect]) {
+            ufPath = ufDirect;
+        } else {
+            NSDirectoryEnumerator *ufe = [fm enumeratorAtPath:frameworksDir];
+            int ufGuard = 0;
+            for (NSString *p in ufe) {
+                if (++ufGuard > 5000) break;
+                if ([p.lastPathComponent isEqualToString:@"UnityFramework"]) {
+                    ufPath = [frameworksDir stringByAppendingPathComponent:p];
+                    break;
+                }
+            }
+        }
+        if (ufPath) {
+            NSString *ufDest = [[self docsDir] stringByAppendingPathComponent:@"UnityFramework"];
+            [fm removeItemAtPath:ufDest error:nil];
+            NSError *ufErr = nil;
+            if ([fm copyItemAtPath:ufPath toPath:ufDest error:&ufErr]) {
+                unsigned long long usz = [[fm attributesOfItemAtPath:ufDest error:nil][NSFileSize] unsignedLongLongValue];
+                [self log:@"Đã xuất UnityFramework (%llu bytes) -> Documents", usz];
+            } else {
+                [self log:@"Copy UnityFramework lỗi: %@", ufErr];
+            }
+        } else {
+            [self log:@"Không tìm thấy UnityFramework binary"];
+        }
+
         NSString *offsetsPath = [[self docsDir] stringByAppendingPathComponent:@"ZheeOffsets.txt"];
         NSError *err = nil;
         [out writeToFile:offsetsPath atomically:YES encoding:NSUTF8StringEncoding error:&err];
@@ -773,7 +815,7 @@ static int cmpMethodNames(const void *a, const void *b) {
         [cs writeToFile:csPath atomically:YES encoding:NSUTF8StringEncoding error:&err];
         if (err) [self log:@"Ghi dump.cs lỗi: %@", err];
         else [self log:@"Đã xuất dump.cs -> %@", csPath];
-        [self log:@"HOÀN TẤT. File trong Documents của app."];
+        [self log:@"HOÀN TẤT. Documents: dump.cs, ZheeOffsets.txt, global-metadata.dat, UnityFramework."];
     }
 }
 
