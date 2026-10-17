@@ -576,9 +576,15 @@ static int cMN(const void *a, const void *b) {
         self.fB.backgroundColor = [UIColor colorWithRed:0.04 green:0.04 blue:0.09 alpha:1];
         self.fB.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.25].CGColor;
         self.fB.layer.borderWidth = 1;
-        self.fB.layer.shadowColor = UIColor.blackColor.CGColor;
-        self.fB.layer.shadowOpacity = 0.45; self.fB.layer.shadowRadius = 10;
+        self.fB.layer.shadowColor = [UIColor colorWithRed:0.0 green:0.82 blue:1.0 alpha:1].CGColor; // glow cyan tho nhe
+        self.fB.layer.shadowOpacity = 0.6; self.fB.layer.shadowRadius = 14;
         self.fB.layer.shadowOffset = CGSizeMake(0, 4);
+        // Nut noi tho nhe (glow pulse lap lai).
+        CABasicAnimation *glow = [CABasicAnimation animationWithKeyPath:@"shadowOpacity"];
+        glow.fromValue = @(0.35); glow.toValue = @(0.85); glow.duration = 1.4;
+        glow.autoreverses = YES; glow.repeatCount = HUGE_VALF;
+        glow.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+        [self.fB.layer addAnimation:glow forKey:@"glow"];
         UIView *logo = [self zL:size * 0.62];
         logo.center = CGPointMake(size / 2, size / 2);
         logo.userInteractionEnabled = NO;
@@ -661,9 +667,9 @@ static int cMN(const void *a, const void *b) {
     self.allSwitches = [NSMutableArray array];
     self.panel = [[UIView alloc] initWithFrame:CGRectMake((screen.size.width - w) / 2, (screen.size.height - h) / 2, w, h)];
     self.panel.layer.cornerRadius = 22;
-    self.panel.layer.shadowColor = UIColor.blackColor.CGColor;
-    self.panel.layer.shadowOpacity = 0.4; self.panel.layer.shadowRadius = 20;
-    self.panel.layer.shadowOffset = CGSizeMake(0, 10);
+    self.panel.layer.shadowColor = [UIColor colorWithRed:1.0 green:0.35 blue:0.12 alpha:1].CGColor; // glow cam quanh panel
+    self.panel.layer.shadowOpacity = 0.35; self.panel.layer.shadowRadius = 24;
+    self.panel.layer.shadowOffset = CGSizeMake(0, 8);
     self.panel.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.18].CGColor;
     self.panel.layer.borderWidth = 1;
     self.panel.clipsToBounds = YES;
@@ -864,6 +870,7 @@ static int cMN(const void *a, const void *b) {
     self.dBtn.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
     self.dBtn.titleEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -6);
     [self.dBtn addTarget:self action:@selector(dA) forControlEvents:UIControlEventTouchUpInside];
+    [self pressFX:self.dBtn];
     [self.dTab addSubview:self.dBtn];
 
     UIButton *deleteButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -877,6 +884,7 @@ static int cMN(const void *a, const void *b) {
     deleteButton.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
     deleteButton.titleEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -6);
     [deleteButton addTarget:self action:@selector(dF) forControlEvents:UIControlEventTouchUpInside];
+    [self pressFX:deleteButton];
     [self.dTab addSubview:deleteButton];
 
     UIButton *exportButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -892,6 +900,7 @@ static int cMN(const void *a, const void *b) {
     exportButton.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
     exportButton.titleEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -6);
     [exportButton addTarget:self action:@selector(eF) forControlEvents:UIControlEventTouchUpInside];
+    [self pressFX:exportButton];
     [self.dTab addSubview:exportButton];
     if (wide) {
         // Rong: 1 hang 3 nut.
@@ -995,7 +1004,7 @@ static int cMN(const void *a, const void *b) {
         @"Dylib": @"ZheeOffsetDump v4",
         @"GitHub": @"github.com/zheedevVn/XzheeTool",
     };
-    for (NSString *k in @[@"Ứng dụng", @"Bundle ID", @"Phiên bản", @"Thiết bị", @"Dylib"]) {
+    for (NSString *k in @[@"Ứng dụng", @"Bundle ID"]) {
         UIView *row = [self iR:k value:info[k] y:ay width:cw];
         [abScroll addSubview:row];
         ay += 30;
@@ -1015,6 +1024,7 @@ static int cMN(const void *a, const void *b) {
     teleBtn.titleEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -6);
     teleBtn.tag = 101;
     [teleBtn addTarget:self action:@selector(openLink:) forControlEvents:UIControlEventTouchUpInside];
+    [self pressFX:teleBtn];
     [abScroll addSubview:teleBtn];
     UIButton *ghBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     ghBtn.frame = CGRectMake(pad + abw + 8, ay, abw, 44);
@@ -1028,6 +1038,7 @@ static int cMN(const void *a, const void *b) {
     ghBtn.titleEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -6);
     ghBtn.tag = 100;
     [ghBtn addTarget:self action:@selector(openLink:) forControlEvents:UIControlEventTouchUpInside];
+    [self pressFX:ghBtn];
     [abScroll addSubview:ghBtn];
     ay += 52;
     abScroll.contentSize = CGSizeMake(cw, ay);
@@ -1087,6 +1098,14 @@ static int cMN(const void *a, const void *b) {
 }
 
 // Hieu ung morph cho icon: nay 1 cai (pop) + nhip morph lien tuc (scale nhe, lap lai).
+// Hieu ung nhan nut: cham -> thu nho 0.95, tha -> tro ve 1.0.
+- (void)btnDown:(UIButton *)b { [UIView animateWithDuration:0.1 animations:^{ b.transform = CGAffineTransformMakeScale(0.95, 0.95); }]; }
+- (void)btnUp:(UIButton *)b { [UIView animateWithDuration:0.15 animations:^{ b.transform = CGAffineTransformIdentity; }]; }
+- (void)pressFX:(UIButton *)b {
+    [b addTarget:self action:@selector(btnDown:) forControlEvents:UIControlEventTouchDown];
+    [b addTarget:self action:@selector(btnUp:) forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel];
+}
+
 - (void)morphPop:(UIView *)v delay:(CGFloat)dl {
     v.transform = CGAffineTransformMakeScale(0.5, 0.5);
     [UIView animateWithDuration:0.45 delay:dl usingSpringWithDamping:0.6 initialSpringVelocity:0.8 options:0 animations:^{
