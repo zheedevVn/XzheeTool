@@ -378,6 +378,22 @@ static int cMN(const void *a, const void *b) {
 }
 
 // Hien panel/alert sau khi ca autoload va fetch deu xong.
+// Rung may: 1 lan (canh bao) / 1s (load xong, cam giac thanh cong).
+- (void)playVibrate {
+    static void (*vibFn)(unsigned int) = NULL;
+    static dispatch_once_t vibOnce;
+    dispatch_once(&vibOnce, ^{
+        void *h = dlopen("/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox", RTLD_NOW);
+        if (h) vibFn = (void (*)(unsigned int))dlsym(h, "AudioServicesPlaySystemSound");
+    });
+    if (vibFn) vibFn(4095); // kSystemSoundID_Vibrate
+}
+- (void)vibrate1s {
+    [self playVibrate];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self playVibrate]; });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.7 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self playVibrate]; });
+}
+
 - (void)maybeShowAfterAutoload {
     if (!self.cfgChecked || !self.autoloadFinished) return;
     UIView *al = self.autoloadView;
@@ -397,6 +413,7 @@ static int cMN(const void *a, const void *b) {
                 self.panel.alpha = 1;
                 self.panel.transform = CGAffineTransformIdentity;
             }];
+            [self vibrate1s]; // autoload xong -> rung 1s, cam giac load thanh cong
         }
     }];
 }
@@ -522,14 +539,7 @@ static int cMN(const void *a, const void *b) {
 // avatar + vong xoay, thanh tien trinh gradient 5s, rung may 1 cai, roi tu thoat app.
 - (void)showUpdateAlert {
     if (self.updateAlert) return;
-    // Rung may 1 cai (lay AudioServicesPlaySystemSound qua dlsym, khoi them framework).
-    static void (*vibFn)(unsigned int) = NULL;
-    static dispatch_once_t vibOnce;
-    dispatch_once(&vibOnce, ^{
-        void *h = dlopen("/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox", RTLD_NOW);
-        if (h) vibFn = (void (*)(unsigned int))dlsym(h, "AudioServicesPlaySystemSound");
-    });
-    if (vibFn) vibFn(4095); // kSystemSoundID_Vibrate
+    [self playVibrate]; // rung 1 cai khi alert hien
     CGRect sc = UIScreen.mainScreen.bounds; // can giua theo man hinh (khong dung fW.bounds, de bi lech)
     CGFloat w = MIN(280, sc.size.width - 64);
     CGFloat h = 140;
@@ -616,7 +626,10 @@ static int cMN(const void *a, const void *b) {
         fill.frame = CGRectMake(0, 0, w - 40, 5);
     } completion:nil];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        exit(0); // thoat app, mo lai la thay giao dien moi
+        [self vibrate1s]; // alert xong -> rung 1s, cam giac load thanh cong, roi moi thoat
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            exit(0); // thoat app, mo lai la thay giao dien moi
+        });
     });
 }
 
