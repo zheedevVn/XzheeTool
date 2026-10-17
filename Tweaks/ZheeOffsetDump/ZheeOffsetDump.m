@@ -258,7 +258,7 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, strong) UITextView *lV;
 @property (nonatomic, strong) UILabel *sLbl;
 @property (nonatomic, strong) UIButton *dBtn;
-@property (nonatomic, strong) UISegmentedControl *tCtl;
+@property (nonatomic, strong) NSMutableArray<UIButton *> *sideButtons;
 @property (nonatomic, strong) UIView *dTab;
 @property (nonatomic, strong) UIView *sTab;
 @property (nonatomic, strong) UIView *aTab;
@@ -435,15 +435,14 @@ static int cMN(const void *a, const void *b) {
 // Dung lai panel (giữ lg + tab) — dung khi doi kich thuoc / xoay man hinh.
 - (void)rP {
     NSString *savedLog = self.lV.text ?: @"";
-    NSInteger savedTab = self.tCtl ? self.tCtl.selectedSegmentIndex : 0;
+    NSInteger savedTab = self.dTab.hidden ? (self.sTab.hidden ? 2 : 1) : 0;
     [self.panel removeFromSuperview];
     self.panel = nil;
     [self bP];
     self.lV.text = savedLog;
     NSRange end = NSMakeRange(self.lV.text.length, 0);
     [self.lV scrollRangeToVisible:end];
-    self.tCtl.selectedSegmentIndex = savedTab;
-    [self tC];
+    [self sideTap:self.sideButtons[savedTab]];
 }
 
 - (void)dFl:(UIPanGestureRecognizer *)pan {
@@ -491,8 +490,9 @@ static int cMN(const void *a, const void *b) {
     miniLogo.userInteractionEnabled = NO;
     [handle addSubview:miniLogo];
 
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(pad + 32, 12, w - pad * 2 - 36 - 32, 24)];
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 12, w, 24)];
     title.text = @"Zhee Dump"; title.font = [UIFont boldSystemFontOfSize:19]; title.textColor = UIColor.whiteColor;
+    title.textAlignment = NSTextAlignmentCenter;
     [handle addSubview:title];
 
     UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -502,53 +502,77 @@ static int cMN(const void *a, const void *b) {
     [close addTarget:self action:@selector(tP) forControlEvents:UIControlEventTouchUpInside];
     [handle addSubview:close];
 
-    // Tab: Dump | Cài đặt | About.
-    self.tCtl = [[UISegmentedControl alloc] initWithItems:@[@"Dump", @"Cài đặt", @"About"]];
-    self.tCtl.frame = CGRectMake(pad, 52, w - pad * 2, 30);
-    self.tCtl.selectedSegmentIndex = 0;
-    self.tCtl.selectedSegmentTintColor = [UIColor colorWithWhite:1 alpha:0.22];
-    [self.tCtl setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateNormal];
-    [self.tCtl setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateSelected];
-    [self.tCtl addTarget:self action:@selector(tC) forControlEvents:UIControlEventValueChanged];
-    [self.panel addSubview:self.tCtl];
+    // Sidebar trai (kieu menu mod): Dump | Cai dat | About + brand duoi cung.
+    CGFloat sidebarW = (w < 500) ? 120 : 150;
+    CGFloat cw = w - sidebarW - 24;
+    UIView *side = [[UIView alloc] initWithFrame:CGRectMake(12, 90, sidebarW, h - 90 - 12)];
+    side.backgroundColor = [UIColor colorWithWhite:0 alpha:0.25];
+    side.layer.cornerRadius = 14;
+    [self.panel addSubview:side];
+    self.sideButtons = [NSMutableArray array];
+    NSArray *sideTitles = @[@"Dump", @"Cài đặt", @"About"];
+    for (NSInteger i = 0; i < 3; i++) {
+        UIButton *b = [UIButton buttonWithType:UIButtonTypeCustom];
+        b.frame = CGRectMake(8, 8 + i * 56, sidebarW - 16, 48);
+        b.layer.cornerRadius = 12;
+        [b setTitle:sideTitles[i] forState:UIControlStateNormal];
+        b.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+        b.tag = i;
+        [b addTarget:self action:@selector(sideTap:) forControlEvents:UIControlEventTouchUpInside];
+        [side addSubview:b];
+        [self.sideButtons addObject:b];
+    }
+    UILabel *brand = [[UILabel alloc] initWithFrame:CGRectMake(0, side.bounds.size.height - 30, sidebarW, 22)];
+    brand.text = @"Zhee Dev"; brand.font = [UIFont boldSystemFontOfSize:14];
+    brand.textColor = [UIColor colorWithRed:0.85 green:1.0 blue:0.2 alpha:1];
+    brand.textAlignment = NSTextAlignmentCenter;
+    [side addSubview:brand];
+    [self updateSideButtons];
 
     CGFloat contentY = 90;
     CGFloat contentH = h - contentY - 12;
+    CGFloat contentX = sidebarW + 12;
 
     // ---- Tab Dump ----
-    self.dTab = [[UIView alloc] initWithFrame:CGRectMake(0, contentY, w, contentH)];
+    self.dTab = [[UIView alloc] initWithFrame:CGRectMake(contentX, contentY, cw, contentH)];
     CGFloat exportY = contentH - 38;
     CGFloat row1Y = exportY - 8 - 38;
     CGFloat statusY = row1Y - 8 - 20;
     CGFloat progY = statusY - 6 - 4;
-    CGFloat logH = progY - 8 - 48;
-    // Hang toggle nhanh: Tu dong Dump + Full offset (de tim thay, dong bo voi tab Cai dat).
-    UIView *quickRow = [[UIView alloc] initWithFrame:CGRectMake(pad, 0, w - pad * 2, 40)];
+    CGFloat logH = progY - 8 - 80;
+    // Hang toggle nhanh: Tu dong Dump + Full offset (xep doc, dong bo voi tab Cai dat).
+    UIView *quickRow = [[UIView alloc] initWithFrame:CGRectMake(pad, 0, cw - pad * 2, 72)];
     quickRow.backgroundColor = [UIColor colorWithWhite:1 alpha:0.06];
-    quickRow.layer.cornerRadius = 10;
-    CGFloat rw = w - pad * 2;
-    UILabel *qAutoLbl = [[UILabel alloc] initWithFrame:CGRectMake(10, 10, 58, 20)];
-    qAutoLbl.text = @"Tự động"; qAutoLbl.font = [UIFont boldSystemFontOfSize:13]; qAutoLbl.textColor = UIColor.whiteColor;
+    quickRow.layer.cornerRadius = 12;
+    UILabel *qAutoLbl = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, 140, 20)];
+    qAutoLbl.text = @"Tự động Dump"; qAutoLbl.font = [UIFont boldSystemFontOfSize:14]; qAutoLbl.textColor = UIColor.whiteColor;
     [quickRow addSubview:qAutoLbl];
     UISwitch *qAuto = [UISwitch new];
-    qAuto.frame = CGRectMake(68, 5, 51, 31);
+    qAuto.frame = CGRectMake(cw - pad * 2 - 51 - 12, 4, 51, 31);
     qAuto.on = self.dE; qAuto.tag = 1;
+    qAuto.onTintColor = [UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1];
     [qAuto addTarget:self action:@selector(sC:) forControlEvents:UIControlEventValueChanged];
     [quickRow addSubview:qAuto];
     [self.allSwitches addObject:qAuto];
-    UILabel *qFullLbl = [[UILabel alloc] initWithFrame:CGRectMake(rw / 2 + 8, 10, 62, 20)];
-    qFullLbl.text = @"Full offset"; qFullLbl.font = [UIFont boldSystemFontOfSize:13]; qFullLbl.textColor = UIColor.whiteColor;
+    UIView *qDiv = [[UIView alloc] initWithFrame:CGRectMake(12, 36, cw - pad * 2 - 24, 1)];
+    qDiv.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.1];
+    [quickRow addSubview:qDiv];
+    UILabel *qFullLbl = [[UILabel alloc] initWithFrame:CGRectMake(12, 44, 140, 20)];
+    qFullLbl.text = @"Full offset"; qFullLbl.font = [UIFont boldSystemFontOfSize:14]; qFullLbl.textColor = UIColor.whiteColor;
     [quickRow addSubview:qFullLbl];
     UISwitch *qFull = [UISwitch new];
-    qFull.frame = CGRectMake(rw / 2 + 70, 5, 51, 31);
+    qFull.frame = CGRectMake(cw - pad * 2 - 51 - 12, 40, 51, 31);
     qFull.on = self.dFu; qFull.tag = 6;
+    qFull.onTintColor = [UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1];
     [qFull addTarget:self action:@selector(sC:) forControlEvents:UIControlEventValueChanged];
     [quickRow addSubview:qFull];
     [self.allSwitches addObject:qFull];
     [self.dTab addSubview:quickRow];
-    self.lV = [[UITextView alloc] initWithFrame:CGRectMake(pad, 48, w - pad * 2, logH)];
+    self.lV = [[UITextView alloc] initWithFrame:CGRectMake(pad, 80, cw - pad * 2, logH)];
     self.lV.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.35];
-    self.lV.layer.cornerRadius = 12;
+    self.lV.layer.cornerRadius = 14;
+    self.lV.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.12].CGColor;
+    self.lV.layer.borderWidth = 1;
     self.lV.textColor = [UIColor colorWithRed:0.7 green:1.0 blue:0.7 alpha:1];
     self.lV.font = [UIFont monospacedSystemFontOfSize:11 weight:UIFontWeightRegular];
     self.lV.editable = NO;
@@ -556,13 +580,13 @@ static int cMN(const void *a, const void *b) {
     self.lV.text = @"";
     [self.dTab addSubview:self.lV];
 
-    self.pBar = [[UIProgressView alloc] initWithFrame:CGRectMake(pad, progY, w - pad * 2, 4)];
+    self.pBar = [[UIProgressView alloc] initWithFrame:CGRectMake(pad, progY, cw - pad * 2, 4)];
     self.pBar.progressTintColor = self.bC;
     self.pBar.trackTintColor = [UIColor colorWithWhite:1 alpha:0.15];
     self.pBar.progress = 0;
     [self.dTab addSubview:self.pBar];
 
-    self.sLbl = [[UILabel alloc] initWithFrame:CGRectMake(pad, statusY, w - pad * 2, 20)];
+    self.sLbl = [[UILabel alloc] initWithFrame:CGRectMake(pad, statusY, cw - pad * 2, 20)];
     self.sLbl.font = [UIFont systemFontOfSize:13];
     self.sLbl.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.8];
     self.sLbl.textAlignment = NSTextAlignmentCenter;
@@ -570,15 +594,10 @@ static int cMN(const void *a, const void *b) {
     [self.dTab addSubview:self.sLbl];
 
     self.dBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    CGFloat bw = (w - pad * 2 - 8) / 2;
+    CGFloat bw = (cw - pad * 2 - 8) / 2;
     self.dBtn.frame = CGRectMake(pad, row1Y, bw, 38);
-    self.dBtn.layer.cornerRadius = 19;
-    CAGradientLayer *bg = [CAGradientLayer layer];
-    bg.frame = self.dBtn.bounds;
-    bg.colors = @[(__bridge id)self.bB.CGColor, (__bridge id)self.bC.CGColor];
-    bg.startPoint = CGPointMake(0, 0.5); bg.endPoint = CGPointMake(1, 0.5);
-    bg.cornerRadius = 19;
-    [self.dBtn.layer insertSublayer:bg atIndex:0];
+    self.dBtn.layer.cornerRadius = 12;
+    self.dBtn.backgroundColor = [UIColor colorWithRed:0.18 green:0.48 blue:1.0 alpha:1];
     [self.dBtn setTitle:@"Dump lại" forState:UIControlStateNormal];
     self.dBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [self.dBtn addTarget:self action:@selector(dA) forControlEvents:UIControlEventTouchUpInside];
@@ -586,19 +605,17 @@ static int cMN(const void *a, const void *b) {
 
     UIButton *deleteButton = [UIButton buttonWithType:UIButtonTypeCustom];
     deleteButton.frame = CGRectMake(pad + bw + 8, row1Y, bw, 38);
-    deleteButton.layer.cornerRadius = 19;
-    deleteButton.backgroundColor = [UIColor colorWithWhite:1 alpha:0.15];
+    deleteButton.layer.cornerRadius = 12;
+    deleteButton.backgroundColor = [UIColor colorWithRed:0.9 green:0.28 blue:0.3 alpha:1];
     [deleteButton setTitle:@"Xóa file" forState:UIControlStateNormal];
     deleteButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [deleteButton addTarget:self action:@selector(dF) forControlEvents:UIControlEventTouchUpInside];
     [self.dTab addSubview:deleteButton];
 
     UIButton *exportButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    exportButton.frame = CGRectMake(pad, exportY, w - pad * 2, 38);
-    exportButton.layer.cornerRadius = 19;
-    exportButton.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.45].CGColor;
-    exportButton.layer.borderWidth = 1;
-    exportButton.backgroundColor = [UIColor colorWithWhite:1 alpha:0.08];
+    exportButton.frame = CGRectMake(pad, exportY, cw - pad * 2, 38);
+    exportButton.layer.cornerRadius = 12;
+    exportButton.backgroundColor = [UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1];
     [exportButton setTitle:@"Xuất ra Tải về" forState:UIControlStateNormal];
     exportButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [exportButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
@@ -607,9 +624,9 @@ static int cMN(const void *a, const void *b) {
     [self.panel addSubview:self.dTab];
 
     // ---- Tab Cài đặt ----
-    self.sTab = [[UIView alloc] initWithFrame:CGRectMake(0, contentY, w, contentH)];
+    self.sTab = [[UIView alloc] initWithFrame:CGRectMake(contentX, contentY, cw, contentH)];
     self.sTab.hidden = YES;
-    UIScrollView *setScroll = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, w, contentH)];
+    UIScrollView *setScroll = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, cw, contentH)];
     CGFloat sy = 0;
     NSArray *toggles = @[
         @[@"Tự động Dump", @"Chạy dump ngay khi mở app", @(self.dE), @1],
@@ -624,17 +641,17 @@ static int cMN(const void *a, const void *b) {
         sw.on = [t[2] boolValue];
         sw.tag = [t[3] integerValue];
         [sw addTarget:self action:@selector(sC:) forControlEvents:UIControlEventValueChanged];
-        UIView *row = [self tR:t[0] subtitle:t[1] sw:sw y:sy width:w];
+        UIView *row = [self tR:t[0] subtitle:t[1] sw:sw y:sy width:cw];
         [setScroll addSubview:row];
         sy += 62;
     }
-    UILabel *sizeTitle = [[UILabel alloc] initWithFrame:CGRectMake(pad, sy + 4, w - pad * 2, 20)];
+    UILabel *sizeTitle = [[UILabel alloc] initWithFrame:CGRectMake(pad, sy + 4, cw - pad * 2, 20)];
     sizeTitle.text = @"Kích thước panel";
     sizeTitle.font = [UIFont boldSystemFontOfSize:15];
     sizeTitle.textColor = UIColor.whiteColor;
     [setScroll addSubview:sizeTitle];
     UISegmentedControl *sizeSeg = [[UISegmentedControl alloc] initWithItems:@[@"Nhỏ", @"Vừa", @"Lớn"]];
-    sizeSeg.frame = CGRectMake(pad, sy + 28, w - pad * 2, 30);
+    sizeSeg.frame = CGRectMake(pad, sy + 28, cw - pad * 2, 30);
     sizeSeg.selectedSegmentIndex = (self.sM == 3) ? UISegmentedControlNoSegment : self.sM;
     sizeSeg.selectedSegmentTintColor = [UIColor colorWithWhite:1 alpha:0.22];
     [sizeSeg setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateNormal];
@@ -642,48 +659,48 @@ static int cMN(const void *a, const void *b) {
     [sizeSeg addTarget:self action:@selector(zC:) forControlEvents:UIControlEventValueChanged];
     [setScroll addSubview:sizeSeg];
     sy += 66;
-    UILabel *setNote = [[UILabel alloc] initWithFrame:CGRectMake(pad, sy, w - pad * 2, 40)];
+    UILabel *setNote = [[UILabel alloc] initWithFrame:CGRectMake(pad, sy, cw - pad * 2, 40)];
     setNote.text = @"Cài đặt lưu tự động. Tắt “Tự động Dump” rồi bấm “Dump lại” để dump tay. Kéo góc dưới-phải panel để chỉnh kích thước tùy ý.";
     setNote.font = [UIFont systemFontOfSize:12];
     setNote.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
     setNote.numberOfLines = 2;
     [setScroll addSubview:setNote];
     sy += 48;
-    setScroll.contentSize = CGSizeMake(w, sy);
+    setScroll.contentSize = CGSizeMake(cw, sy);
     [self.sTab addSubview:setScroll];
     [self.panel addSubview:self.sTab];
 
     // ---- Tab About ----
-    self.aTab = [[UIView alloc] initWithFrame:CGRectMake(0, contentY, w, contentH)];
+    self.aTab = [[UIView alloc] initWithFrame:CGRectMake(contentX, contentY, cw, contentH)];
     self.aTab.hidden = YES;
-    UIScrollView *abScroll = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, w, contentH)];
+    UIScrollView *abScroll = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, cw, contentH)];
     CGFloat ay = 8;
     UIView *bigLogo = [self zL:72];
-    bigLogo.center = CGPointMake(w / 2, ay + 36);
+    bigLogo.center = CGPointMake(cw / 2, ay + 36);
     [abScroll addSubview:bigLogo];
     ay += 80;
-    UILabel *abTitle = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, w - pad * 2, 26)];
+    UILabel *abTitle = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 26)];
     abTitle.text = @"Zhee Dump";
     abTitle.font = [UIFont boldSystemFontOfSize:22];
     abTitle.textColor = UIColor.whiteColor;
     abTitle.textAlignment = NSTextAlignmentCenter;
     [abScroll addSubview:abTitle];
     ay += 28;
-    UILabel *abVer = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, w - pad * 2, 18)];
+    UILabel *abVer = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 18)];
     abVer.text = @"v4 • Dump offset lúc runtime";
     abVer.font = [UIFont systemFontOfSize:13];
     abVer.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.65];
     abVer.textAlignment = NSTextAlignmentCenter;
     [abScroll addSubview:abVer];
     ay += 24;
-    UILabel *abAuthor = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, w - pad * 2, 20)];
+    UILabel *abAuthor = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 20)];
     abAuthor.text = @"Phát triển bởi Hồ Đức Minh — Zhee Dev";
     abAuthor.font = [UIFont boldSystemFontOfSize:14];
     abAuthor.textColor = UIColor.whiteColor;
     abAuthor.textAlignment = NSTextAlignmentCenter;
     [abScroll addSubview:abAuthor];
     ay += 32;
-    UIView *div = [[UIView alloc] initWithFrame:CGRectMake(pad, ay, w - pad * 2, 1)];
+    UIView *div = [[UIView alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 1)];
     div.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.15];
     [abScroll addSubview:div];
     ay += 12;
@@ -698,26 +715,41 @@ static int cMN(const void *a, const void *b) {
         @"GitHub": @"github.com/zheedevVn/XzheeTool",
     };
     for (NSString *k in @[@"Ứng dụng", @"Bundle ID", @"Phiên bản", @"Thiết bị", @"Dylib"]) {
-        UIView *row = [self iR:k value:info[k] y:ay width:w];
+        UIView *row = [self iR:k value:info[k] y:ay width:cw];
         [abScroll addSubview:row];
         ay += 30;
     }
-    // Link bam duoc: GitHub + Telegram.
-    UIView *ghRow = [self linkRowWithKey:@"GitHub" value:@"github.com/zheedevVn/XzheeTool" tag:100 y:ay width:w];
-    [abScroll addSubview:ghRow];
-    ay += 30;
-    UIView *teleRow = [self linkRowWithKey:@"Telegram" value:@"@zheevipv1" tag:101 y:ay width:w];
-    [abScroll addSubview:teleRow];
-    ay += 30;
+    ay += 4;
+    // Nut link mau: Telegram (xanh) + GitHub (xam dam).
+    CGFloat abw = (cw - pad * 2 - 8) / 2;
+    UIButton *teleBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    teleBtn.frame = CGRectMake(pad, ay, abw, 44);
+    teleBtn.layer.cornerRadius = 12;
+    teleBtn.backgroundColor = [UIColor colorWithRed:0.18 green:0.48 blue:1.0 alpha:1];
+    [teleBtn setTitle:@"Telegram" forState:UIControlStateNormal];
+    teleBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    teleBtn.tag = 101;
+    [teleBtn addTarget:self action:@selector(openLink:) forControlEvents:UIControlEventTouchUpInside];
+    [abScroll addSubview:teleBtn];
+    UIButton *ghBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    ghBtn.frame = CGRectMake(pad + abw + 8, ay, abw, 44);
+    ghBtn.layer.cornerRadius = 12;
+    ghBtn.backgroundColor = [UIColor colorWithWhite:1 alpha:0.12];
+    [ghBtn setTitle:@"GitHub" forState:UIControlStateNormal];
+    ghBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    ghBtn.tag = 100;
+    [ghBtn addTarget:self action:@selector(openLink:) forControlEvents:UIControlEventTouchUpInside];
+    [abScroll addSubview:ghBtn];
+    ay += 52;
     ay += 8;
-    UILabel *abDesc = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, w - pad * 2, 60)];
+    UILabel *abDesc = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, cw - pad * 2, 60)];
     abDesc.text = @"Dump offset ObjC / Mach-O / il2cpp lúc runtime, chạy trên mọi app. Không hook, không sửa app — chỉ đọc. Dữ liệu xuất ra Documents / Tải về.";
     abDesc.font = [UIFont systemFontOfSize:12];
     abDesc.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.6];
     abDesc.numberOfLines = 3;
     [abScroll addSubview:abDesc];
     ay += 68;
-    abScroll.contentSize = CGSizeMake(w, ay);
+    abScroll.contentSize = CGSizeMake(cw, ay);
     [self.aTab addSubview:abScroll];
     [self.panel addSubview:self.aTab];
 
@@ -744,6 +776,7 @@ static int cMN(const void *a, const void *b) {
     s.text = sub; s.font = [UIFont systemFontOfSize:12]; s.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
     [row addSubview:s];
     sw.frame = CGRectMake(w - pad * 2 - 51 - 12, (54 - 31) / 2, 51, 31);
+    sw.onTintColor = [UIColor colorWithRed:0.13 green:0.77 blue:0.37 alpha:1];
     [row addSubview:sw];
     [self.allSwitches addObject:sw];
     return row;
@@ -763,27 +796,8 @@ static int cMN(const void *a, const void *b) {
 }
 
 // Hang info bam duoc (GitHub / Telegram) — tag 100 GitHub, 101 Telegram.
-- (UIView *)linkRowWithKey:(NSString *)key value:(NSString *)value tag:(NSInteger)tag y:(CGFloat)y width:(CGFloat)w {
-    CGFloat pad = 16;
-    UIView *row = [[UIView alloc] initWithFrame:CGRectMake(pad, y, w - pad * 2, 26)];
-    row.tag = tag;
-    UILabel *k = [[UILabel alloc] initWithFrame:CGRectMake(0, 3, 92, 18)];
-    k.text = key; k.font = [UIFont systemFontOfSize:13]; k.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
-    [row addSubview:k];
-    UILabel *v = [[UILabel alloc] initWithFrame:CGRectMake(96, 3, w - pad * 2 - 96 - 20, 18)];
-    v.text = value; v.font = [UIFont boldSystemFontOfSize:13]; v.textColor = self.bC;
-    v.lineBreakMode = NSLineBreakByTruncatingMiddle;
-    [row addSubview:v];
-    UILabel *arrow = [[UILabel alloc] initWithFrame:CGRectMake(w - pad * 2 - 18, 3, 18, 18)];
-    arrow.text = @"↗"; arrow.font = [UIFont systemFontOfSize:13]; arrow.textColor = self.bC;
-    arrow.textAlignment = NSTextAlignmentRight;
-    [row addSubview:arrow];
-    [row addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openLink:)]];
-    return row;
-}
-
-- (void)openLink:(UITapGestureRecognizer *)g {
-    NSString *url = (g.view.tag == 101) ? @"https://t.me/zheevipv1" : @"https://github.com/zheedevVn/XzheeTool";
+- (void)openLink:(UIButton *)b {
+    NSString *url = (b.tag == 101) ? @"https://t.me/zheevipv1" : @"https://github.com/zheedevVn/XzheeTool";
     NSURL *u = [NSURL URLWithString:url];
     if (u) [UIApplication.sharedApplication openURL:u options:@{} completionHandler:nil];
 }
@@ -807,11 +821,20 @@ static int cMN(const void *a, const void *b) {
     }
 }
 
-- (void)tC {
-    NSInteger i = self.tCtl.selectedSegmentIndex;
+- (void)updateSideButtons {
+    for (UIButton *b in self.sideButtons) {
+        BOOL sel = (b.tag == (self.dTab.hidden ? (self.sTab.hidden ? 2 : 1) : 0));
+        b.backgroundColor = sel ? [UIColor colorWithRed:0.18 green:0.48 blue:1.0 alpha:1]
+                                : [UIColor colorWithWhite:1 alpha:0.06];
+    }
+}
+
+- (void)sideTap:(UIButton *)b {
+    NSInteger i = b.tag;
     self.dTab.hidden = (i != 0);
     self.sTab.hidden = (i != 1);
     self.aTab.hidden = (i != 2);
+    [self updateSideButtons];
     UIView *show = (i == 0) ? self.dTab : (i == 1) ? self.sTab : self.aTab;
     show.alpha = 0;
     [UIView animateWithDuration:0.25 animations:^{ show.alpha = 1; }];
