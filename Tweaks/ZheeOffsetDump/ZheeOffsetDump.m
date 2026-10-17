@@ -654,9 +654,9 @@ static int cMN(const void *a, const void *b) {
 - (void)bP {
     CGRect screen = UIScreen.mainScreen.bounds;
     // Panel noi giua man hinh, chua khoang game xung quanh (khong dinh sat mep):
-    // ngang -> 70% rong, 94% cao; doc -> 92% rong, 82% cao.
+    // ngang -> 68% rong, 92% cao; doc -> 92% rong, 82% cao.
     BOOL land = screen.size.width > screen.size.height;
-    CGSize sz = CGSizeMake(screen.size.width * (land ? 0.70 : 0.92), screen.size.height * (land ? 0.94 : 0.82));
+    CGSize sz = CGSizeMake(screen.size.width * (land ? 0.68 : 0.92), screen.size.height * (land ? 0.92 : 0.82));
     CGFloat w = sz.width, h = sz.height;
     self.allSwitches = [NSMutableArray array];
     self.panel = [[UIView alloc] initWithFrame:CGRectMake((screen.size.width - w) / 2, (screen.size.height - h) / 2, w, h)];
@@ -680,50 +680,49 @@ static int cMN(const void *a, const void *b) {
     dim.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [self.panel addSubview:dim];
 
-    // Thanh tiêu đề = tay cầm kéo panel.
+    // Sidebar trai = cot doc full chieu cao, sat mep trai (kieu panel mau).
+    CGFloat sidebarW = (w < 500) ? 120 : 150;
+    CGFloat cw = w - sidebarW; // rong vung noi dung (sau sidebar)
+    UIView *side = [[UIView alloc] initWithFrame:CGRectMake(0, 0, sidebarW, h)];
+    side.autoresizingMask = UIViewAutoresizingFlexibleHeight;
+    side.backgroundColor = [UIColor colorWithWhite:0 alpha:0.25];
+    [self.panel addSubview:side];
+    // Duong chia doc giua sidebar va noi dung.
+    UIView *sideDiv = [[UIView alloc] initWithFrame:CGRectMake(sidebarW - 1, 0, 1, h)];
+    sideDiv.autoresizingMask = UIViewAutoresizingFlexibleHeight;
+    sideDiv.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.1];
+    [self.panel addSubview:sideDiv];
+
+    // Thanh tiêu đề = tay cầm kéo panel (chi tren vung noi dung, sau sidebar).
     CGFloat pad = 16;
-    UIView *handle = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 48)];
+    UIView *handle = [[UIView alloc] initWithFrame:CGRectMake(sidebarW, 0, cw, 48)];
     handle.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     [self.panel addSubview:handle];
     UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dPn:)];
     panelPan.delegate = self;
     [handle addGestureRecognizer:panelPan];
 
-    UIView *miniLogo = [self zL:26];
-    miniLogo.frame = CGRectMake(pad, 11, 26, 26);
-    miniLogo.userInteractionEnabled = NO;
-    [handle addSubview:miniLogo];
-
-    // Tieu de tab hien tai (kieu panel mau): icon + ten tab viet hoa, mau cam.
+    // Tieu de tab hien tai (kieu panel mau): icon + ten tab viet hoa, mau cam, sat nhau.
     self.tabTitleIcon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"arrow.down.to.line"]];
     self.tabTitleIcon.tintColor = [self acc];
     self.tabTitleIcon.contentMode = UIViewContentModeScaleAspectFit;
-    self.tabTitleIcon.frame = CGRectMake(pad + 34, 12, 24, 24);
+    self.tabTitleIcon.frame = CGRectMake(pad, 12, 24, 24);
     [handle addSubview:self.tabTitleIcon];
-    self.tabTitleLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad + 66, 11, w - pad - 66 - 48, 26)];
+    self.tabTitleLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad + 32, 11, cw - pad - 32 - 48, 26)];
     self.tabTitleLabel.text = @"DUMP";
     self.tabTitleLabel.font = [self rF:20 w:UIFontWeightBold];
     self.tabTitleLabel.textColor = [self acc];
     [handle addSubview:self.tabTitleLabel];
 
     UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
-    close.frame = CGRectMake(w - 40, 10, 28, 28);
+    close.frame = CGRectMake(cw - 40, 10, 28, 28);
     close.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
     [close setImage:[UIImage systemImageNamed:@"xmark"] forState:UIControlStateNormal];
     close.tintColor = [self acc];
-    [close setImage:[UIImage systemImageNamed:@"xmark.circle.fill"] forState:UIControlStateNormal];
-    close.tintColor = [UIColor.whiteColor colorWithAlphaComponent:0.7];
     [close addTarget:self action:@selector(tP) forControlEvents:UIControlEventTouchUpInside];
     [handle addSubview:close];
 
-    // Sidebar trai (kieu menu mod): Dump | Cai dat | About + brand duoi cung.
-    CGFloat sidebarW = (w < 500) ? 120 : 150;
-    CGFloat cw = w - sidebarW - 24;
-    UIView *side = [[UIView alloc] initWithFrame:CGRectMake(12, 90, sidebarW, h - 90 - 12)];
-    side.autoresizingMask = UIViewAutoresizingFlexibleHeight;
-    side.backgroundColor = [UIColor colorWithWhite:0 alpha:0.25];
-    side.layer.cornerRadius = 14;
-    [self.panel addSubview:side];
+    // Nut sidebar (kieu panel mau): icon + nhan, rai deu doc, can giua nut.
     self.sideButtons = [NSMutableArray array];
     NSArray *sideTitles = @[@"Dump", @"Cài đặt", @"About"];
     NSArray *sideIcons = @[@"arrow.down.to.line", @"gearshape", @"info.circle"];
@@ -766,9 +765,10 @@ static int cMN(const void *a, const void *b) {
     [side addSubview:brand];
     [self updateSideButtons];
 
-    CGFloat contentY = 90;
-    CGFloat contentH = h - contentY - 12;
-    CGFloat contentX = sidebarW + 12;
+    // Vung noi dung: sau sidebar, duoi thanh tieu de, padding deu 16.
+    CGFloat contentY = 48;
+    CGFloat contentH = h - contentY - 16;
+    CGFloat contentX = sidebarW;
 
     // ---- Tab Dump ----
     self.dTab = [[UIView alloc] initWithFrame:CGRectMake(contentX, contentY, cw, contentH)];
