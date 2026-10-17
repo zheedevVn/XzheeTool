@@ -272,7 +272,10 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, assign) BOOL dI;
 @property (nonatomic, assign) BOOL dER;
 @property (nonatomic, assign) BOOL dFu;      // full offset: ca system framework
-@property (nonatomic, assign) NSInteger sM; // 0 Nho, 1 Vua, 2 Lon
+@property (nonatomic, assign) NSInteger sM; // 0 Nho, 1 Vua, 2 Lon, 3 Tuy chinh (keo goc)
+@property (nonatomic, strong) NSMutableArray<UISwitch *> *allSwitches;
+@property (nonatomic, assign) CGFloat customW;
+@property (nonatomic, assign) CGFloat customH;
 @end
 
 @implementation ZDC
@@ -316,8 +319,10 @@ static int cMN(const void *a, const void *b) {
     self.dI = [d objectForKey:zStr(kS30, sizeof(kS30))] ? [d boolForKey:zStr(kS30, sizeof(kS30))] : YES;
     self.dER = [d objectForKey:zStr(kS31, sizeof(kS31))] ? [d boolForKey:zStr(kS31, sizeof(kS31))] : YES;
     self.dFu = [d boolForKey:zStr(kS32, sizeof(kS32))]; // mac dinh NO: chi app bundle
-    self.sM = [d integerForKey:zStr(kS33, sizeof(kS33))]; // 0 Nho, 1 Vua, 2 Lon
-    if (self.sM < 0 || self.sM > 2) self.sM = 1;
+    self.sM = [d integerForKey:zStr(kS33, sizeof(kS33))]; // 0 Nho, 1 Vua, 2 Lon, 3 Tuy chinh
+    if (self.sM < 0 || self.sM > 3) self.sM = 1;
+    self.customW = [d doubleForKey:@"zheedump.cw"];
+    self.customH = [d doubleForKey:@"zheedump.ch"];
 }
 
 - (void)sSv {
@@ -329,6 +334,8 @@ static int cMN(const void *a, const void *b) {
     [d setBool:self.dER forKey:zStr(kS31, sizeof(kS31))];
     [d setBool:self.dFu forKey:zStr(kS32, sizeof(kS32))];
     [d setInteger:self.sM forKey:zStr(kS33, sizeof(kS33))];
+    [d setDouble:self.customW forKey:@"zheedump.cw"];
+    [d setDouble:self.customH forKey:@"zheedump.ch"];
 }
 
 // Logo ZheeSign: chu Z neon (cyan -> tim -> hong) tren nen toi.
@@ -353,9 +360,11 @@ static int cMN(const void *a, const void *b) {
 }
 
 - (CGSize)pS:(NSInteger)mode screen:(CGRect)screen {
-    if (mode == 0) return CGSizeMake(MIN(screen.size.width - 32, 300), MIN(screen.size.height - 160, 420));
-    if (mode == 2) return CGSizeMake(MIN(screen.size.width - 24, 430), MIN(screen.size.height - 80, 640));
-    return CGSizeMake(MIN(screen.size.width - 32, 360), MIN(screen.size.height - 120, 520));
+    if (mode == 3) return CGSizeMake(MIN(MAX(self.customW, 260), screen.size.width - 16),
+                                    MIN(MAX(self.customH, 320), screen.size.height - 32));
+    if (mode == 0) return CGSizeMake(screen.size.width - 64, screen.size.height - 120);
+    if (mode == 2) return CGSizeMake(screen.size.width - 16, screen.size.height - 32);
+    return CGSizeMake(screen.size.width - 32, screen.size.height - 64);
 }
 
 - (void)st {
@@ -453,6 +462,7 @@ static int cMN(const void *a, const void *b) {
     CGRect screen = UIScreen.mainScreen.bounds;
     CGSize sz = [self pS:self.sM screen:screen];
     CGFloat w = sz.width, h = sz.height;
+    self.allSwitches = [NSMutableArray array];
     self.panel = [[UIView alloc] initWithFrame:CGRectMake((screen.size.width - w) / 2, (screen.size.height - h) / 2, w, h)];
     self.panel.layer.cornerRadius = 22;
     self.panel.layer.shadowColor = UIColor.blackColor.CGColor;
@@ -511,8 +521,32 @@ static int cMN(const void *a, const void *b) {
     CGFloat row1Y = exportY - 8 - 38;
     CGFloat statusY = row1Y - 8 - 20;
     CGFloat progY = statusY - 6 - 4;
-    CGFloat logH = progY - 8;
-    self.lV = [[UITextView alloc] initWithFrame:CGRectMake(pad, 0, w - pad * 2, logH)];
+    CGFloat logH = progY - 8 - 48;
+    // Hang toggle nhanh: Tu dong Dump + Full offset (de tim thay, dong bo voi tab Cai dat).
+    UIView *quickRow = [[UIView alloc] initWithFrame:CGRectMake(pad, 0, w - pad * 2, 40)];
+    quickRow.backgroundColor = [UIColor colorWithWhite:1 alpha:0.06];
+    quickRow.layer.cornerRadius = 10;
+    CGFloat rw = w - pad * 2;
+    UILabel *qAutoLbl = [[UILabel alloc] initWithFrame:CGRectMake(10, 10, 58, 20)];
+    qAutoLbl.text = @"Tự động"; qAutoLbl.font = [UIFont boldSystemFontOfSize:13]; qAutoLbl.textColor = UIColor.whiteColor;
+    [quickRow addSubview:qAutoLbl];
+    UISwitch *qAuto = [UISwitch new];
+    qAuto.frame = CGRectMake(68, 5, 51, 31);
+    qAuto.on = self.dE; qAuto.tag = 1;
+    [qAuto addTarget:self action:@selector(sC:) forControlEvents:UIControlEventValueChanged];
+    [quickRow addSubview:qAuto];
+    [self.allSwitches addObject:qAuto];
+    UILabel *qFullLbl = [[UILabel alloc] initWithFrame:CGRectMake(rw / 2 + 8, 10, 62, 20)];
+    qFullLbl.text = @"Full offset"; qFullLbl.font = [UIFont boldSystemFontOfSize:13]; qFullLbl.textColor = UIColor.whiteColor;
+    [quickRow addSubview:qFullLbl];
+    UISwitch *qFull = [UISwitch new];
+    qFull.frame = CGRectMake(rw / 2 + 70, 5, 51, 31);
+    qFull.on = self.dFu; qFull.tag = 6;
+    [qFull addTarget:self action:@selector(sC:) forControlEvents:UIControlEventValueChanged];
+    [quickRow addSubview:qFull];
+    [self.allSwitches addObject:qFull];
+    [self.dTab addSubview:quickRow];
+    self.lV = [[UITextView alloc] initWithFrame:CGRectMake(pad, 48, w - pad * 2, logH)];
     self.lV.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.35];
     self.lV.layer.cornerRadius = 12;
     self.lV.textColor = [UIColor colorWithRed:0.7 green:1.0 blue:0.7 alpha:1];
@@ -601,7 +635,7 @@ static int cMN(const void *a, const void *b) {
     [setScroll addSubview:sizeTitle];
     UISegmentedControl *sizeSeg = [[UISegmentedControl alloc] initWithItems:@[@"Nhỏ", @"Vừa", @"Lớn"]];
     sizeSeg.frame = CGRectMake(pad, sy + 28, w - pad * 2, 30);
-    sizeSeg.selectedSegmentIndex = self.sM;
+    sizeSeg.selectedSegmentIndex = (self.sM == 3) ? UISegmentedControlNoSegment : self.sM;
     sizeSeg.selectedSegmentTintColor = [UIColor colorWithWhite:1 alpha:0.22];
     [sizeSeg setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateNormal];
     [sizeSeg setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateSelected];
@@ -609,7 +643,7 @@ static int cMN(const void *a, const void *b) {
     [setScroll addSubview:sizeSeg];
     sy += 66;
     UILabel *setNote = [[UILabel alloc] initWithFrame:CGRectMake(pad, sy, w - pad * 2, 40)];
-    setNote.text = @"Cài đặt lưu tự động. Tắt “Tự động Dump” rồi bấm “Dump lại” để dump tay.";
+    setNote.text = @"Cài đặt lưu tự động. Tắt “Tự động Dump” rồi bấm “Dump lại” để dump tay. Kéo góc dưới-phải panel để chỉnh kích thước tùy ý.";
     setNote.font = [UIFont systemFontOfSize:12];
     setNote.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
     setNote.numberOfLines = 2;
@@ -663,11 +697,18 @@ static int cMN(const void *a, const void *b) {
         @"Dylib": @"ZheeOffsetDump v4",
         @"GitHub": @"github.com/zheedevVn/XzheeTool",
     };
-    for (NSString *k in @[@"Ứng dụng", @"Bundle ID", @"Phiên bản", @"Thiết bị", @"Dylib", @"GitHub"]) {
+    for (NSString *k in @[@"Ứng dụng", @"Bundle ID", @"Phiên bản", @"Thiết bị", @"Dylib"]) {
         UIView *row = [self iR:k value:info[k] y:ay width:w];
         [abScroll addSubview:row];
         ay += 30;
     }
+    // Link bam duoc: GitHub + Telegram.
+    UIView *ghRow = [self linkRowWithKey:@"GitHub" value:@"github.com/zheedevVn/XzheeTool" tag:100 y:ay width:w];
+    [abScroll addSubview:ghRow];
+    ay += 30;
+    UIView *teleRow = [self linkRowWithKey:@"Telegram" value:@"@zheevipv1" tag:101 y:ay width:w];
+    [abScroll addSubview:teleRow];
+    ay += 30;
     ay += 8;
     UILabel *abDesc = [[UILabel alloc] initWithFrame:CGRectMake(pad, ay, w - pad * 2, 60)];
     abDesc.text = @"Dump offset ObjC / Mach-O / il2cpp lúc runtime, chạy trên mọi app. Không hook, không sửa app — chỉ đọc. Dữ liệu xuất ra Documents / Tải về.";
@@ -679,6 +720,16 @@ static int cMN(const void *a, const void *b) {
     abScroll.contentSize = CGSizeMake(w, ay);
     [self.aTab addSubview:abScroll];
     [self.panel addSubview:self.aTab];
+
+    // Tay cam keo goc duoi-phai de resize panel.
+    UIView *grip = [[UIView alloc] initWithFrame:CGRectMake(w - 30, h - 30, 30, 30)];
+    grip.backgroundColor = [UIColor colorWithWhite:1 alpha:0.12];
+    UIImageView *gripIcon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"arrow.up.left.and.arrow.down.right"]];
+    gripIcon.tintColor = [UIColor.whiteColor colorWithAlphaComponent:0.7];
+    gripIcon.frame = CGRectMake(6, 6, 18, 18);
+    [grip addSubview:gripIcon];
+    [grip addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(gripPan:)]];
+    [self.panel addSubview:grip];
 }
 
 - (UIView *)tR:(NSString *)title subtitle:(NSString *)sub sw:(UISwitch *)sw y:(CGFloat)y width:(CGFloat)w {
@@ -694,6 +745,7 @@ static int cMN(const void *a, const void *b) {
     [row addSubview:s];
     sw.frame = CGRectMake(w - pad * 2 - 51 - 12, (54 - 31) / 2, 51, 31);
     [row addSubview:sw];
+    [self.allSwitches addObject:sw];
     return row;
 }
 
@@ -708,6 +760,51 @@ static int cMN(const void *a, const void *b) {
     v.lineBreakMode = NSLineBreakByTruncatingMiddle;
     [row addSubview:v];
     return row;
+}
+
+// Hang info bam duoc (GitHub / Telegram) — tag 100 GitHub, 101 Telegram.
+- (UIView *)linkRowWithKey:(NSString *)key value:(NSString *)value tag:(NSInteger)tag y:(CGFloat)y width:(CGFloat)w {
+    CGFloat pad = 16;
+    UIView *row = [[UIView alloc] initWithFrame:CGRectMake(pad, y, w - pad * 2, 26)];
+    row.tag = tag;
+    UILabel *k = [[UILabel alloc] initWithFrame:CGRectMake(0, 3, 92, 18)];
+    k.text = key; k.font = [UIFont systemFontOfSize:13]; k.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
+    [row addSubview:k];
+    UILabel *v = [[UILabel alloc] initWithFrame:CGRectMake(96, 3, w - pad * 2 - 96 - 20, 18)];
+    v.text = value; v.font = [UIFont boldSystemFontOfSize:13]; v.textColor = self.bC;
+    v.lineBreakMode = NSLineBreakByTruncatingMiddle;
+    [row addSubview:v];
+    UILabel *arrow = [[UILabel alloc] initWithFrame:CGRectMake(w - pad * 2 - 18, 3, 18, 18)];
+    arrow.text = @"↗"; arrow.font = [UIFont systemFontOfSize:13]; arrow.textColor = self.bC;
+    arrow.textAlignment = NSTextAlignmentRight;
+    [row addSubview:arrow];
+    [row addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openLink:)]];
+    return row;
+}
+
+- (void)openLink:(UITapGestureRecognizer *)g {
+    NSString *url = (g.view.tag == 101) ? @"https://t.me/zheevipv1" : @"https://github.com/zheedevVn/XzheeTool";
+    NSURL *u = [NSURL URLWithString:url];
+    if (u) [UIApplication.sharedApplication openURL:u options:@{} completionHandler:nil];
+}
+
+// Keo goc duoi-phai de resize panel (tha ra thi luu kich thuoc tuy chinh + dung lai layout).
+- (void)gripPan:(UIPanGestureRecognizer *)pan {
+    if (pan.state == UIGestureRecognizerStateChanged) {
+        CGPoint t = [pan translationInView:self.panel];
+        CGRect f = self.panel.frame;
+        CGRect b = UIScreen.mainScreen.bounds;
+        f.size.width = MAX(260, MIN(b.size.width - 16, f.size.width + t.x));
+        f.size.height = MAX(320, MIN(b.size.height - 32, f.size.height + t.y));
+        self.panel.frame = f;
+        [pan setTranslation:CGPointZero inView:self.panel];
+    } else if (pan.state == UIGestureRecognizerStateEnded || pan.state == UIGestureRecognizerStateCancelled) {
+        self.customW = self.panel.frame.size.width;
+        self.customH = self.panel.frame.size.height;
+        self.sM = 3;
+        [self sSv];
+        [self rP];
+    }
 }
 
 - (void)tC {
@@ -730,6 +827,10 @@ static int cMN(const void *a, const void *b) {
         case 6: self.dFu = sw.on; break;
     }
     [self sSv];
+    // Dong bo switch cung chuc nang o tab kia (Dump <-> Cai dat).
+    for (UISwitch *other in self.allSwitches) {
+        if (other != sw && other.tag == sw.tag) other.on = sw.on;
+    }
 }
 
 - (void)zC:(UISegmentedControl *)seg {

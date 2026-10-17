@@ -8,14 +8,15 @@ Chạy trên mọi app (không hardcode bundle ID).
 
 Nút nổi logo Z (kéo thả) → panel 3 tab, mở app là tự chạy dump:
 
-- **Dump**: log live + thanh tiến trình + nút Dump lại / Xóa file / Xuất ra Tải về.
+- **Dump**: toggle nhanh (Tự động Dump + Full offset) + log live +
+  thanh tiến trình + nút Dump lại / Xóa file / Xuất ra Tải về.
 - **Cài đặt**: toggle từng phần (Tự động Dump, ObjC, Symbols, il2cpp,
   Xuất file gốc, **Full offset**), chọn kích thước panel (Nhỏ / Vừa / Lớn).
-  Cài đặt lưu tự động.
+  Cài đặt lưu tự động. Kéo góc dưới-phải panel để chỉnh kích thước tùy ý.
 - **About**: logo, tác giả Hồ Đức Minh — Zhee Dev, info app (bundle ID,
-  phiên bản, thiết bị, iOS).
+  phiên bản, thiết bị, iOS), link GitHub + Telegram (@zheevipv1) bấm được.
 
-Panel tự dựng lại khi xoay ngang/dọc.
+Panel gần full màn hình, tự dựng lại khi xoay ngang/dọc.
 
 ## Output
 
