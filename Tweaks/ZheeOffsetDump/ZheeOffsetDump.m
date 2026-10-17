@@ -264,6 +264,7 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, strong) UIView *aTab;
 @property (nonatomic, strong) UIProgressView *pBar;
 @property (nonatomic, strong) NSDictionary *cfg; // cau hinh UI tai tu GitHub (panel.json)
+@property (nonatomic, strong) UIView *updateToast;
 @property (nonatomic, assign) BOOL dmp;
 @property (nonatomic, assign) BOOL dmpCancel;
 @property (nonatomic, assign) BOOL iDone;
@@ -358,6 +359,7 @@ static int cMN(const void *a, const void *b) {
 }
 - (void)fetchCfg {
     NSDictionary *oldCfg = self.cfg ?: @{};
+    BOOL hadCache = (self.cfg != nil);
     NSString *urlStr = [NSString stringWithFormat:@"https://raw.githubusercontent.com/zheedevVn/XzheeTool/main/Tweaks/ZheeOffsetDump/panel.json?t=%lld", (long long)[[NSDate date] timeIntervalSince1970]];
     NSURL *url = [NSURL URLWithString:urlStr];
     if (!url) return;
@@ -370,13 +372,59 @@ static int cMN(const void *a, const void *b) {
         if (![obj isKindOfClass:[NSDictionary class]]) return;
         NSData *oldData = [NSJSONSerialization dataWithJSONObject:oldCfg options:0 error:nil];
         NSData *newData = [NSJSONSerialization dataWithJSONObject:obj options:0 error:nil];
-        if ([oldData isEqualToData:newData]) return; // khong doi -> giu nguyen panel
+        if ([oldData isEqualToData:newData]) return; // khong doi -> im lang, khong lam gi
         [data writeToFile:[NSTemporaryDirectory() stringByAppendingPathComponent:@"zhee-panel.json"] atomically:YES];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.cfg = obj;
-            [self rP]; // dung lai panel theo cau hinh moi (giu log + tab + trang thai an/hien)
+            if (!hadCache) {
+                // Lan dau: ap dung im lang, khong thong bao, khong thoat app.
+                if (!self.panel.hidden) [self rP];
+            } else {
+                // Co phien ban giao dien moi: toast 5s roi tu thoat app, mo lai thay giao dien moi.
+                [self showUpdateToast];
+            }
         });
     }] resume];
+}
+
+// Toast thong bao cap nhat giao dien (5s) roi tu thoat app.
+- (void)showUpdateToast {
+    if (self.updateToast) return;
+    CGFloat w = MIN(300, self.fW.bounds.size.width - 32);
+    CGFloat h = 46;
+    CGFloat top = self.fW.safeAreaInsets.top;
+    UIView *toast = [[UIView alloc] initWithFrame:CGRectMake((self.fW.bounds.size.width - w) / 2, -h, w, h)];
+    toast.layer.cornerRadius = h / 2;
+    toast.clipsToBounds = YES;
+    toast.userInteractionEnabled = NO;
+    toast.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.18].CGColor;
+    toast.layer.borderWidth = 1;
+    toast.layer.shadowColor = UIColor.blackColor.CGColor;
+    toast.layer.shadowOpacity = 0.4; toast.layer.shadowRadius = 12; toast.layer.shadowOffset = CGSizeMake(0, 4);
+    UIVisualEffectView *blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleDark]];
+    blur.frame = toast.bounds;
+    [toast addSubview:blur];
+    UIView *dim = [[UIView alloc] initWithFrame:toast.bounds];
+    dim.backgroundColor = [UIColor colorWithRed:0.1 green:0.1 blue:0.14 alpha:0.85];
+    [toast addSubview:dim];
+    UIActivityIndicatorView *spin = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+    spin.color = UIColor.whiteColor;
+    spin.frame = CGRectMake(14, (h - 24) / 2, 24, 24);
+    [spin startAnimating];
+    [toast addSubview:spin];
+    UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(44, 0, w - 56, h)];
+    lbl.text = @"Đang cập nhật giao diện…";
+    lbl.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+    lbl.textColor = UIColor.whiteColor;
+    [toast addSubview:lbl];
+    self.updateToast = toast;
+    [self.fW addSubview:toast];
+    [UIView animateWithDuration:0.35 delay:0 usingSpringWithDamping:0.8 initialSpringVelocity:0.5 options:0 animations:^{
+        toast.frame = CGRectMake((self.fW.bounds.size.width - w) / 2, top + 12, w, h);
+    } completion:nil];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        exit(0); // thoat app, mo lai la thay giao dien moi
+    });
 }
 
 - (void)sSv {

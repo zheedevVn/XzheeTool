@@ -35,9 +35,11 @@ chữ About, avatar, giá trị mặc định của các toggle) đọc từ fil
 
 - Dylib tải `raw.githubusercontent.com/zheedevVn/XzheeTool/main/Tweaks/ZheeOffsetDump/panel.json`
   (timeout 5s), cache ở tmp, mất mạng thì dùng cache / mặc định cứng.
-- Sửa `panel.json` trên GitHub → lần mở app sau panel tự dựng lại
-  theo cấu hình mới (giữ nguyên log + tab đang mở), **không cần gỡ
-  tiêm lại**.
+- Sửa `panel.json` trên GitHub → lần mở app sau (hoặc mở panel),
+  dylib tự tải cấu hình mới. Nếu có phiên bản giao diện mới, app hiện
+  toast “Đang cập nhật giao diện…” 5 giây rồi tự thoát — mở lại app là
+  thấy giao diện mới. **Không cần gỡ tiêm lại, không cần xóa app.**
+  Không có phiên bản mới thì mọi thứ im lặng, không hiện gì.
 - Giá trị người dùng đã lưu (UserDefaults) luôn ưu tiên hơn giá trị
   mặc định trong `panel.json`.
 
