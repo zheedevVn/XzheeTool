@@ -277,11 +277,8 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, assign) BOOL dFu;      // full offset: ca system framework
 @property (nonatomic, assign) NSInteger sM; // 0 Nho, 1 Vua, 2 Lon, 3 Tuy chinh (keo goc)
 @property (nonatomic, strong) NSMutableArray<UISwitch *> *allSwitches;
-@property (nonatomic, assign) CGFloat panelScale; // scale nguyen khoi panel (keo grip) 0.6..1.0
 @property (nonatomic, strong) UILabel *tabTitleLabel;
 @property (nonatomic, strong) UIImageView *tabTitleIcon;
-@property (nonatomic, assign) CGFloat dragScale;
-@property (nonatomic, assign) CGPoint dragStart;
 @end
 
 @implementation ZDC
@@ -326,10 +323,6 @@ static int cMN(const void *a, const void *b) {
     self.dI = [d objectForKey:zStr(kS30, sizeof(kS30))] ? [d boolForKey:zStr(kS30, sizeof(kS30))] : [self cfgBool:@"dumpIl2cppDefault" def:YES];
     self.dER = [d objectForKey:zStr(kS31, sizeof(kS31))] ? [d boolForKey:zStr(kS31, sizeof(kS31))] : [self cfgBool:@"exportRawDefault" def:YES];
     self.dFu = [d objectForKey:zStr(kS32, sizeof(kS32))] ? [d boolForKey:zStr(kS32, sizeof(kS32))] : [self cfgBool:@"fullOffsetDefault" def:NO];
-    self.sM = [d objectForKey:zStr(kS33, sizeof(kS33))] ? [d integerForKey:zStr(kS33, sizeof(kS33))] : MIN(2, MAX(0, [self cfgInt:@"sizeDefault" def:1]));
-    if (self.sM < 0 || self.sM > 3) self.sM = 1;
-    self.panelScale = [d doubleForKey:@"zheedump.scale"];
-    if (self.panelScale < 0.6 || self.panelScale > 1.0) self.panelScale = 1.0;
 }
 
 // ---- Cau hinh UI tu xa (panel.json tren GitHub) ----
@@ -504,8 +497,6 @@ static int cMN(const void *a, const void *b) {
     [d setBool:self.dI forKey:zStr(kS30, sizeof(kS30))];
     [d setBool:self.dER forKey:zStr(kS31, sizeof(kS31))];
     [d setBool:self.dFu forKey:zStr(kS32, sizeof(kS32))];
-    [d setInteger:self.sM forKey:zStr(kS33, sizeof(kS33))];
-    [d setDouble:self.panelScale forKey:@"zheedump.scale"];
 }
 
 // Logo ZheeSign: chu Z neon (cyan -> tim -> hong) tren nen toi.
@@ -896,9 +887,9 @@ static int cMN(const void *a, const void *b) {
     setScroll.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     // Dan hang toggle de lap day panel (panel cao -> hang cao hon + can giua).
     CGFloat fill = 1.0;
-    if (contentH > 448) fill = MIN(1.4, (contentH - 76) / 372.0);
+    if (contentH > 372) fill = MIN(1.4, contentH / 372.0);
     CGFloat rowH = 54 * fill;
-    CGFloat totalH = 6 * (rowH + 8) + 76;
+    CGFloat totalH = 6 * (rowH + 8);
     CGFloat sy = (totalH < contentH) ? (contentH - totalH) / 2 : 0;
     NSArray *toggles = @[
         @[@"Tự động Dump", @"Chạy dump ngay khi mở app", @(self.dE), @1],
@@ -917,21 +908,6 @@ static int cMN(const void *a, const void *b) {
         [setScroll addSubview:row];
         sy += rowH + 8;
     }
-    UILabel *sizeTitle = [[UILabel alloc] initWithFrame:CGRectMake(pad, sy + 4, cw - pad * 2, 20)];
-    sizeTitle.text = @"Kích thước panel";
-    sizeTitle.font = [self rF:17 w:UIFontWeightSemibold];
-    sizeTitle.textColor = UIColor.whiteColor;
-    [setScroll addSubview:sizeTitle];
-    UISegmentedControl *sizeSeg = [[UISegmentedControl alloc] initWithItems:@[@"Nhỏ", @"Vừa", @"Lớn"]];
-    sizeSeg.frame = CGRectMake(pad, sy + 28, cw - pad * 2, 40);
-    sizeSeg.selectedSegmentIndex = (self.sM == 3) ? UISegmentedControlNoSegment : self.sM;
-    sizeSeg.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1];
-    sizeSeg.selectedSegmentTintColor = [self acc];
-    [sizeSeg setTitleTextAttributes:@{NSForegroundColorAttributeName: [UIColor colorWithWhite:0.6 alpha:1], NSFontAttributeName: [self rF:15 w:UIFontWeightSemibold]} forState:UIControlStateNormal];
-    [sizeSeg setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor, NSFontAttributeName: [self rF:15 w:UIFontWeightSemibold]} forState:UIControlStateSelected];
-    [sizeSeg addTarget:self action:@selector(zC:) forControlEvents:UIControlEventValueChanged];
-    [setScroll addSubview:sizeSeg];
-    sy += 76;
     setScroll.contentSize = CGSizeMake(cw, sy);
     [self.sTab addSubview:setScroll];
     [self.panel addSubview:self.sTab];
@@ -1028,19 +1004,6 @@ static int cMN(const void *a, const void *b) {
     abScroll.contentSize = CGSizeMake(cw, ay);
     [self.aTab addSubview:abScroll];
     [self.panel addSubview:self.aTab];
-
-    // Tay cam keo goc duoi-phai de resize panel.
-    UIView *grip = [[UIView alloc] initWithFrame:CGRectMake(w - 30, h - 30, 30, 30)];
-    grip.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleTopMargin;
-    grip.backgroundColor = [UIColor colorWithWhite:1 alpha:0.12];
-    UIImageView *gripIcon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"arrow.up.left.and.arrow.down.right"]];
-    gripIcon.tintColor = [UIColor.whiteColor colorWithAlphaComponent:0.7];
-    gripIcon.frame = CGRectMake(9, 9, 12, 12);
-    [grip addSubview:gripIcon];
-    [grip addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(gripPan:)]];
-    [self.panel addSubview:grip];
-    // Scale nguyen khoi theo ti le da luu.
-    self.panel.transform = CGAffineTransformMakeScale(self.panelScale, self.panelScale);
 }
 
 - (UIView *)tR:(NSString *)title subtitle:(NSString *)sub sw:(UISwitch *)sw y:(CGFloat)y width:(CGFloat)w height:(CGFloat)h {
@@ -1092,25 +1055,6 @@ static int cMN(const void *a, const void *b) {
         [data writeToFile:cache atomically:YES];
         dispatch_async(dispatch_get_main_queue(), ^{ iv.image = img; });
     }] resume];
-}
-
-// Keo goc duoi-phai de resize panel (tha ra thi luu kich thuoc tuy chinh + dung lai layout).
-- (void)gripPan:(UIPanGestureRecognizer *)pan {
-    if (pan.state == UIGestureRecognizerStateBegan) {
-        self.dragScale = self.panelScale;
-        self.dragStart = [pan locationInView:self.fW];
-    } else if (pan.state == UIGestureRecognizerStateChanged) {
-        // Keo grip -> scale nguyen khoi panel (khong doi frame, khong be layout).
-        CGPoint f = [pan locationInView:self.fW];
-        CGFloat dx = f.x - self.dragStart.x, dy = f.y - self.dragStart.y;
-        CGFloat bw = self.panel.bounds.size.width, bh = self.panel.bounds.size.height;
-        CGFloat scale = MIN((bw * self.dragScale + dx) / bw, (bh * self.dragScale + dy) / bh);
-        self.panelScale = MAX(0.6, MIN(1.0, scale));
-        self.panel.transform = CGAffineTransformMakeScale(self.panelScale, self.panelScale);
-    } else if (pan.state == UIGestureRecognizerStateEnded || pan.state == UIGestureRecognizerStateCancelled) {
-        self.sM = 3;
-        [self sSv];
-    }
 }
 
 - (void)updateSideButtons {
@@ -1166,34 +1110,23 @@ static int cMN(const void *a, const void *b) {
     }
 }
 
-- (void)zC:(UISegmentedControl *)seg {
-    self.sM = seg.selectedSegmentIndex;
-    CGFloat scales[3] = {0.7, 0.85, 1.0};
-    self.panelScale = scales[self.sM];
-    [self sSv];
-    // Chi scale nguyen khoi, khong dung lai panel.
-    [UIView animateWithDuration:0.25 animations:^{
-        self.panel.transform = CGAffineTransformMakeScale(self.panelScale, self.panelScale);
-    }];
-}
-
 - (void)tP {
     BOOL show = self.panel.hidden;
     self.panel.hidden = NO;
     if (show) [self fetchCfg]; // mo panel -> lay giao dien moi nhat tren GitHub, co doi thi dung lai ngay
     if (show) {
         self.panel.alpha = 0;
-        self.panel.transform = CGAffineTransformMakeScale(self.panelScale * 0.85, self.panelScale * 0.85);
+        self.panel.transform = CGAffineTransformMakeScale(0.85, 0.85);
         [UIView animateWithDuration:0.45 delay:0 usingSpringWithDamping:0.75 initialSpringVelocity:0.6 options:0 animations:^{
             self.panel.alpha = 1;
-            self.panel.transform = CGAffineTransformMakeScale(self.panelScale, self.panelScale);
+            self.panel.transform = CGAffineTransformIdentity;
         } completion:nil];
     } else {
         [UIView animateWithDuration:0.22 animations:^{
             self.panel.alpha = 0;
-            self.panel.transform = CGAffineTransformMakeScale(self.panelScale * 0.92, self.panelScale * 0.92);
+            self.panel.transform = CGAffineTransformMakeScale(0.92, 0.92);
         } completion:^(BOOL f) {
-            self.panel.transform = CGAffineTransformMakeScale(self.panelScale, self.panelScale);
+            self.panel.transform = CGAffineTransformIdentity;
             self.panel.hidden = YES;
         }];
     }
@@ -1205,7 +1138,7 @@ static int cMN(const void *a, const void *b) {
     c.x += t.x; c.y += t.y;
     CGRect b = self.fW.bounds;
     CGFloat m = 60;
-    CGFloat hw = self.panel.bounds.size.width * self.panelScale / 2, hh = self.panel.bounds.size.height * self.panelScale / 2;
+    CGFloat hw = self.panel.bounds.size.width / 2, hh = self.panel.bounds.size.height / 2;
     c.x = MAX(hw - (self.panel.bounds.size.width - m), MIN(b.size.width - hw + (self.panel.bounds.size.width - m), c.x));
     c.y = MAX(hh - (self.panel.bounds.size.height - m), MIN(b.size.height - hh + (self.panel.bounds.size.height - m), c.y));
     self.panel.center = c;
