@@ -401,11 +401,11 @@ static int cMN(const void *a, const void *b) {
     }];
 }
 
-// Man hinh autoload luc moi vao app: kinh mo + logo Z + thanh tien trinh chay 1.5s.
+// Man hinh autoload luc moi vao app: avatar + vong xoay (nhu alert update) + thanh tien trinh chay lien tuc.
 - (void)showAutoload {
     CGRect sc = UIScreen.mainScreen.bounds; // can giua theo man hinh (khong dung fW.bounds, de bi lech)
     CGFloat w = MIN(280, sc.size.width - 64);
-    CGFloat h = 118;
+    CGFloat h = 140;
     UIView *al = [[UIView alloc] initWithFrame:CGRectMake((sc.size.width - w) / 2, (sc.size.height - h) / 2, w, h)];
     al.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin;
     al.layer.cornerRadius = 20;
@@ -423,29 +423,60 @@ static int cMN(const void *a, const void *b) {
     dim.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
     dim.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [al addSubview:dim];
-    UIView *logo = [self zL:40];
-    logo.frame = CGRectMake((w - 40) / 2, 10, 40, 40);
-    [al addSubview:logo];
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(16, 52, w - 32, 20)];
+    // Avatar cua user + vong xoay (nhu alert update).
+    CGFloat ax = (w - 48) / 2;
+    UIView *avatarBox = [[UIView alloc] initWithFrame:CGRectMake(ax, 10, 48, 48)];
+    avatarBox.layer.cornerRadius = 24;
+    avatarBox.clipsToBounds = YES;
+    avatarBox.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.08];
+    NSData *avData = [NSData dataWithContentsOfFile:[NSTemporaryDirectory() stringByAppendingPathComponent:@"zhee-avatar.png"]];
+    UIImage *avImg = avData ? [UIImage imageWithData:avData] : nil;
+    if (avImg) {
+        UIImageView *av = [[UIImageView alloc] initWithImage:avImg];
+        av.frame = avatarBox.bounds;
+        av.contentMode = UIViewContentModeScaleAspectFill;
+        [avatarBox addSubview:av];
+    } else {
+        [avatarBox addSubview:[self zL:48]];
+    }
+    [al addSubview:avatarBox];
+    UIView *ring = [[UIView alloc] initWithFrame:CGRectMake(ax - 4, 6, 56, 56)];
+    ring.backgroundColor = UIColor.clearColor;
+    CAShapeLayer *arc = [CAShapeLayer layer];
+    arc.frame = ring.bounds;
+    arc.fillColor = UIColor.clearColor.CGColor;
+    arc.strokeColor = [UIColor colorWithRed:0.2 green:0.6 blue:1.0 alpha:1].CGColor;
+    arc.lineWidth = 3;
+    arc.lineCap = kCALineCapRound;
+    arc.path = [UIBezierPath bezierPathWithArcCenter:CGPointMake(28, 28) radius:25 startAngle:-M_PI_2 endAngle:-M_PI_2 + M_PI * 1.2 clockwise:YES].CGPath;
+    [ring.layer addSublayer:arc];
+    CABasicAnimation *spin = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
+    spin.fromValue = @(0); spin.toValue = @(M_PI * 2); spin.duration = 1.2; spin.repeatCount = HUGE_VALF;
+    [ring.layer addAnimation:spin forKey:@"spin"];
+    [al addSubview:ring];
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(16, 70, w - 32, 20)];
     title.text = @"Zhee Dump";
     title.font = [self rF:16 w:UIFontWeightBold];
     title.textColor = UIColor.blackColor;
     title.textAlignment = NSTextAlignmentCenter;
     [al addSubview:title];
-    UILabel *sub = [[UILabel alloc] initWithFrame:CGRectMake(16, 74, w - 32, 16)];
+    UILabel *sub = [[UILabel alloc] initWithFrame:CGRectMake(16, 92, w - 32, 16)];
     sub.text = @"Đang tải…";
     sub.font = [self rF:12 w:UIFontWeightRegular];
     sub.textColor = [UIColor colorWithWhite:0.35 alpha:1];
     sub.textAlignment = NSTextAlignmentCenter;
     [al addSubview:sub];
-    UIView *track = [[UIView alloc] initWithFrame:CGRectMake(20, h - 20, w - 40, 5)];
+    // Thanh tien trinh chay lien tuc (truot qua lai, khong dung yen o 100%).
+    CGFloat trackW = w - 40;
+    UIView *track = [[UIView alloc] initWithFrame:CGRectMake(20, h - 20, trackW, 5)];
     track.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.12];
     track.layer.cornerRadius = 2.5;
     track.clipsToBounds = YES;
     [al addSubview:track];
-    UIView *fill = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, 5)];
+    CGFloat fillW = trackW * 0.4;
+    UIView *fill = [[UIView alloc] initWithFrame:CGRectMake(-fillW, 0, fillW, 5)];
     CAGradientLayer *grad = [CAGradientLayer layer];
-    grad.frame = CGRectMake(0, 0, w - 40, 5);
+    grad.frame = CGRectMake(0, 0, fillW, 5);
     grad.colors = @[(id)[UIColor colorWithRed:0.11 green:0.63 blue:0.95 alpha:1].CGColor,
                     (id)[UIColor colorWithRed:0.00 green:0.82 blue:1.00 alpha:1].CGColor,
                     (id)[UIColor colorWithRed:0.55 green:0.25 blue:1.00 alpha:1].CGColor];
@@ -454,12 +485,13 @@ static int cMN(const void *a, const void *b) {
     [track addSubview:fill];
     self.autoloadView = al;
     [self.fW addSubview:al];
-    [UIView animateWithDuration:1.5 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
-        fill.frame = CGRectMake(0, 0, w - 40, 5);
-    } completion:^(BOOL f) {
+    [UIView animateWithDuration:1.0 delay:0 options:UIViewAnimationOptionRepeat | UIViewAnimationOptionCurveEaseInOut animations:^{
+        fill.frame = CGRectMake(trackW, 0, fillW, 5);
+    } completion:nil];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         self.autoloadFinished = YES;
         [self maybeShowAfterAutoload];
-    }];
+    });
 }
 
 - (void)fetchCfg {
