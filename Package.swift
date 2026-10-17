@@ -98,7 +98,7 @@ let package = Package(
         .target(
             name: "CXKit",
             dependencies: [
-                .product(name: "OpenSSL", package: "xtool-core")
+                .product(name: "OpenSSL", package: "XzheeTool-core")
             ],
             cSettings: cSettings + (
                 xtoolVersion
@@ -138,9 +138,9 @@ let package = Package(
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "SwiftyMobileDevice", package: "SwiftyMobileDevice"),
                 .product(name: "Zupersign", package: "zsign"),
-                .product(name: "SignerSupport", package: "xtool-core"),
-                .product(name: "ProtoCodable", package: "xtool-core"),
-                .product(name: "Superutils", package: "xtool-core"),
+                .product(name: "SignerSupport", package: "XzheeTool-core"),
+                .product(name: "ProtoCodable", package: "XzheeTool-core"),
+                .product(name: "Superutils", package: "XzheeTool-core"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "CryptoExtras", package: "swift-crypto"),
                 .product(name: "X509", package: "swift-certificates"),
@@ -202,7 +202,7 @@ let package = Package(
             dependencies: [
                 "XUtils",
                 "XcodeProjects",
-                .product(name: "Superutils", package: "xtool-core"),
+                .product(name: "Superutils", package: "XzheeTool-core"),
                 .product(name: "Yams", package: "Yams"),
                 .product(name: "XcodeProjectFormat", package: "xcode-project-format"),
             ],

@@ -434,7 +434,7 @@
       }
     },
     {
-      "identity" : "xtool-core",
+      "identity" : "xzheetool-core",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/zheedevVn/XzheeTool-core",
       "state" : {
