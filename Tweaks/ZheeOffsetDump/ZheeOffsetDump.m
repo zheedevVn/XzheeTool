@@ -277,6 +277,7 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, assign) BOOL dFu;      // full offset: ca system framework
 @property (nonatomic, assign) NSInteger sM; // 0 Nho, 1 Vua, 2 Lon, 3 Tuy chinh (keo goc)
 @property (nonatomic, strong) NSMutableArray<UISwitch *> *allSwitches;
+@property (nonatomic, assign) CGFloat panelScale; // scale nguyen khoi panel (keo grip) 0.6..1.0
 @property (nonatomic, strong) UILabel *tabTitleLabel;
 @property (nonatomic, strong) UIImageView *tabTitleIcon;
 @property (nonatomic, assign) CGFloat dragScale;
