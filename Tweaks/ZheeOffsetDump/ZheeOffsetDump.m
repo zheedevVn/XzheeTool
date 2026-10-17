@@ -223,6 +223,10 @@ static int cmpMethodNames(const void *a, const void *b) {
         self.floatWindow.frame = screen;
         self.floatWindow.windowLevel = UIWindowLevelAlert + 1;
         self.floatWindow.backgroundColor = UIColor.clearColor;
+        // Host VC trong suot de present UIDocumentPicker (view tat tuong tac -> cham xuyen).
+        UIViewController *host = [UIViewController new];
+        host.view.userInteractionEnabled = NO;
+        self.floatWindow.rootViewController = host;
 
         self.floatButton = [UIButton buttonWithType:UIButtonTypeCustom];
         self.floatButton.frame = CGRectMake(screen.size.width - size - 16, screen.size.height / 2 - size / 2, size, size);
@@ -302,7 +306,9 @@ static int cmpMethodNames(const void *a, const void *b) {
     [handle addSubview:close];
 
     // Log view.
-    CGFloat logY = 52, logH = h - 52 - 44 - 28 - 12;
+    CGFloat exportY = h - 44;            // nut Xuat ra Tai ve
+    CGFloat row1Y = exportY - 8 - 38;    // hang Dump lai / Xoa file
+    CGFloat logY = 52, logH = row1Y - 8 - 52 - 28;
     self.logView = [[UITextView alloc] initWithFrame:CGRectMake(pad, logY, w - pad * 2, logH)];
     self.logView.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.35];
     self.logView.layer.cornerRadius = 12;
@@ -322,7 +328,7 @@ static int cmpMethodNames(const void *a, const void *b) {
 
     self.dumpButton = [UIButton buttonWithType:UIButtonTypeCustom];
     CGFloat bw = (w - pad * 2 - 8) / 2;
-    self.dumpButton.frame = CGRectMake(pad, h - 44, bw, 38);
+    self.dumpButton.frame = CGRectMake(pad, row1Y, bw, 38);
     self.dumpButton.layer.cornerRadius = 19;
     CAGradientLayer *bg = [CAGradientLayer layer];
     bg.frame = self.dumpButton.bounds;
@@ -337,13 +343,26 @@ static int cmpMethodNames(const void *a, const void *b) {
 
     // Xóa file dump sau khi copy (dọn dấu vết — anti-cheat hay quét file dump).
     UIButton *deleteButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    deleteButton.frame = CGRectMake(pad + bw + 8, h - 44, bw, 38);
+    deleteButton.frame = CGRectMake(pad + bw + 8, row1Y, bw, 38);
     deleteButton.layer.cornerRadius = 19;
     deleteButton.backgroundColor = [UIColor colorWithWhite:1 alpha:0.15];
     [deleteButton setTitle:@"Xóa file" forState:UIControlStateNormal];
     deleteButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [deleteButton addTarget:self action:@selector(deleteFiles) forControlEvents:UIControlEventTouchUpInside];
     [self.panel addSubview:deleteButton];
+
+    // Xuất 4 file ra thư mục Tải về (qua trình chọn của Files — app sandbox không ghi trực tiếp được).
+    UIButton *exportButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    exportButton.frame = CGRectMake(pad, exportY, w - pad * 2, 38);
+    exportButton.layer.cornerRadius = 19;
+    exportButton.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.45].CGColor;
+    exportButton.layer.borderWidth = 1;
+    exportButton.backgroundColor = [UIColor colorWithWhite:1 alpha:0.08];
+    [exportButton setTitle:@"Xuất ra Tải về" forState:UIControlStateNormal];
+    exportButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [exportButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    [exportButton addTarget:self action:@selector(exportFiles) forControlEvents:UIControlEventTouchUpInside];
+    [self.panel addSubview:exportButton];
 }
 
 - (void)togglePanel {
@@ -384,6 +403,38 @@ static int cmpMethodNames(const void *a, const void *b) {
     if (self.dumping) return;
     dispatch_async(dispatch_get_main_queue(), ^{ self.logView.text = @""; });
     [self startDump];
+}
+
+- (void)exportFiles {
+    NSMutableArray<NSURL *> *urls = [NSMutableArray array];
+    NSString *docs = [self docsDir];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    for (NSString *name in @[@"dump.cs", @"ZheeOffsets.txt", @"global-metadata.dat", @"UnityFramework"]) {
+        NSString *p = [docs stringByAppendingPathComponent:name];
+        if ([fm fileExistsAtPath:p]) [urls addObject:[NSURL fileURLWithPath:p]];
+    }
+    if (urls.count == 0) {
+        [self log:@"Chưa có file để xuất — bấm Dump lại trước"];
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIViewController *picker = nil;
+        if (@available(iOS 16.0, *)) {
+            picker = [[UIDocumentPickerViewController alloc] initForExportingURLs:urls];
+        } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            picker = [[UIDocumentPickerViewController alloc] initWithURLs:urls inMode:UIDocumentPickerModeExportToService];
+#pragma clang diagnostic pop
+        }
+        UIViewController *host = self.floatWindow.rootViewController;
+        if (host) {
+            [host presentViewController:picker animated:YES completion:nil];
+            [self log:@"Đã mở trình chọn — chọn thư mục Tải về"];
+        } else {
+            [self log:@"Không mở được trình chọn thư mục"];
+        }
+    });
 }
 
 - (void)deleteFiles {

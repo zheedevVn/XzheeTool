@@ -20,7 +20,8 @@ Trong Documents của app, sau khi dump xong:
 
 1. Inject `ZheeOffsetDump.dylib` vào IPA mục tiêu, cài vào máy.
 2. Mở app → panel "Zhee Dump" hiện ra, log chạy live. Đợi tới "HOÀN TẤT".
-3. Lấy 4 file trong Documents của app (qua Filza / Files / iMazing…).
+3. Lấy 4 file trong Documents của app (qua Filza / Files / iMazing…),
+   hoặc bấm "Xuất ra Tải về" trong panel → chọn thư mục Tải về.
 4. Muốn dọn dấu vết: bấm "Xóa file" trong panel.
 
 ## Dùng với Frida / Il2CppDumper
