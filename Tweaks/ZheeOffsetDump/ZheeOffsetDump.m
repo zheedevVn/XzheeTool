@@ -282,6 +282,9 @@ static int cMN(const void *a, const void *b) {
 @property (nonatomic, assign) BOOL cfgChecked; // da kiem tra panel.json lan dau chua
 @property (nonatomic, assign) BOOL userClosedPanel; // user vua dong panel
 @property (nonatomic, assign) UIBackgroundTaskIdentifier bgTask; // task giu dump chay khi app ra nen
+@property (nonatomic, strong) UIView *autoloadView; // man hinh autoload luc moi vao app
+@property (nonatomic, assign) BOOL autoloadFinished; // autoload chay xong chua
+@property (nonatomic, assign) BOOL pendingUpdate; // co update doi sau autoload khong
 @end
 
 @implementation ZDC
@@ -356,16 +359,13 @@ static int cMN(const void *a, const void *b) {
     id obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
     if ([obj isKindOfClass:[NSDictionary class]]) self.cfg = obj;
 }
-// Giai quyet sau khi kiem tra panel.json: lan dau thi mo panel neu khong co update;
+// Giai quyet sau khi kiem tra panel.json: lan dau thi doi autoload xong moi hien panel/alert;
 // co update thi chi hien alert (panel giu an, khong hien truoc).
 - (void)cfgResolveWithUpdate:(BOOL)changed hadCache:(BOOL)hadCache {
     if (!self.cfgChecked) {
         self.cfgChecked = YES;
-        if (changed && hadCache) {
-            [self showUpdateAlert];
-        } else if (!self.userClosedPanel) {
-            self.panel.hidden = NO;
-        }
+        self.pendingUpdate = (changed && hadCache);
+        [self maybeShowAfterAutoload];
         return;
     }
     // Cac lan kiem tra sau (mo panel): chi xu ly khi co update that.
@@ -375,6 +375,90 @@ static int cMN(const void *a, const void *b) {
     } else {
         [self showUpdateAlert];
     }
+}
+
+// Hien panel/alert sau khi ca autoload va fetch deu xong.
+- (void)maybeShowAfterAutoload {
+    if (!self.cfgChecked || !self.autoloadFinished) return;
+    UIView *al = self.autoloadView;
+    self.autoloadView = nil;
+    [UIView animateWithDuration:0.3 animations:^{
+        al.alpha = 0;
+    } completion:^(BOOL f) {
+        [al removeFromSuperview];
+        if (self.pendingUpdate) {
+            [self showUpdateAlert];
+        } else if (!self.userClosedPanel) {
+            // Hien panel muot (fade + scale), khong hien dot ngot.
+            self.panel.alpha = 0;
+            self.panel.hidden = NO;
+            self.panel.transform = CGAffineTransformMakeScale(0.95, 0.95);
+            [UIView animateWithDuration:0.35 animations:^{
+                self.panel.alpha = 1;
+                self.panel.transform = CGAffineTransformIdentity;
+            }];
+        }
+    }];
+}
+
+// Man hinh autoload luc moi vao app: kinh mo + logo Z + thanh tien trinh chay 1.5s.
+- (void)showAutoload {
+    CGRect fb = self.fW.bounds;
+    CGFloat w = MIN(320, fb.size.width - 48);
+    CGFloat h = 150;
+    UIView *al = [[UIView alloc] initWithFrame:CGRectMake((fb.size.width - w) / 2, (fb.size.height - h) / 2, w, h)];
+    al.layer.cornerRadius = 20;
+    al.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.5].CGColor;
+    al.layer.borderWidth = 1;
+    al.layer.shadowColor = UIColor.blackColor.CGColor;
+    al.layer.shadowOpacity = 0.3; al.layer.shadowRadius = 16; al.layer.shadowOffset = CGSizeMake(0, 8);
+    al.clipsToBounds = YES;
+    al.userInteractionEnabled = NO; // cham xuyen xuong game
+    UIVisualEffectView *blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleLight]];
+    blur.frame = al.bounds;
+    blur.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [al addSubview:blur];
+    UIView *dim = [[UIView alloc] initWithFrame:al.bounds];
+    dim.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.55];
+    dim.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [al addSubview:dim];
+    UIView *logo = [self zL:48];
+    logo.frame = CGRectMake((w - 48) / 2, 14, 48, 48);
+    [al addSubview:logo];
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(16, 66, w - 32, 24)];
+    title.text = @"Zhee Dump";
+    title.font = [self rF:17 w:UIFontWeightBold];
+    title.textColor = UIColor.blackColor;
+    title.textAlignment = NSTextAlignmentCenter;
+    [al addSubview:title];
+    UILabel *sub = [[UILabel alloc] initWithFrame:CGRectMake(16, 90, w - 32, 18)];
+    sub.text = @"Đang tải…";
+    sub.font = [self rF:13 w:UIFontWeightRegular];
+    sub.textColor = [UIColor colorWithWhite:0.35 alpha:1];
+    sub.textAlignment = NSTextAlignmentCenter;
+    [al addSubview:sub];
+    UIView *track = [[UIView alloc] initWithFrame:CGRectMake(20, h - 24, w - 40, 6)];
+    track.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.12];
+    track.layer.cornerRadius = 3;
+    track.clipsToBounds = YES;
+    [al addSubview:track];
+    UIView *fill = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, 6)];
+    CAGradientLayer *grad = [CAGradientLayer layer];
+    grad.frame = CGRectMake(0, 0, w - 40, 6);
+    grad.colors = @[(id)[UIColor colorWithRed:0.11 green:0.63 blue:0.95 alpha:1].CGColor,
+                    (id)[UIColor colorWithRed:0.00 green:0.82 blue:1.00 alpha:1].CGColor,
+                    (id)[UIColor colorWithRed:0.55 green:0.25 blue:1.00 alpha:1].CGColor];
+    grad.startPoint = CGPointMake(0, 0.5); grad.endPoint = CGPointMake(1, 0.5);
+    [fill.layer addSublayer:grad];
+    [track addSubview:fill];
+    self.autoloadView = al;
+    [self.fW addSubview:al];
+    [UIView animateWithDuration:1.5 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+        fill.frame = CGRectMake(0, 0, w - 40, 6);
+    } completion:^(BOOL f) {
+        self.autoloadFinished = YES;
+        [self maybeShowAfterAutoload];
+    }];
 }
 
 - (void)fetchCfg {
@@ -595,6 +679,7 @@ static int cMN(const void *a, const void *b) {
 
         [self bP];
         self.panel.hidden = YES; // an panel san, chi hien sau khi kiem tra update xong (khong hien panel truoc alert)
+        [self showAutoload]; // man hinh autoload luc moi vao (loading + thanh tien trinh), roi moi hien panel
         self.fW.hidden = NO;
         [self fetchCfg]; // lay panel.json moi nhat tren GitHub, co thay doi thi dung lai panel
         // Xoay ngang/doc: dung lai panel + keo nut noi vao trong man hinh.
