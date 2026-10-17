@@ -49,7 +49,7 @@ static NSString *zStr(const unsigned char *enc, size_t len) {
     return [NSString stringWithUTF8String:zChr(enc, len)];
 }
 static BOOL zDA(void) {
-    int mib[4] = {CTL_KERN, KERN_INFO, KERN_INFO_PROC, getpid()};
+    int mib[4] = {1, 14, 1, getpid()}; // {CTL_KERN, KERN_INFO, KERN_INFO_PROC, pid} (so, SDK iOS khong khai bao ten)
     struct kinfo_proc info;
     size_t size = sizeof(info);
     memset(&info, 0, sizeof(info));
