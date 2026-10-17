@@ -280,7 +280,7 @@ static int cmpMethodNames(const void *a, const void *b) {
     UIView *v = [[UIView alloc] initWithFrame:CGRectMake(0, 0, s, s)];
     CATextLayer *text = [CATextLayer layer];
     text.string = @"Z";
-    text.font = @"ArialRoundedMTBold";
+    text.font = (__bridge CFTypeRef _Nullable)(@"ArialRoundedMTBold");
     text.fontSize = s * 0.82;
     text.alignmentMode = kCAAlignmentCenter;
     text.frame = CGRectMake(0, -s * 0.06, s, s);
