@@ -8,8 +8,9 @@ Không hook, không sửa gì trong app — chỉ đọc runtime.
 Trong Documents của app, sau khi dump xong:
 
 - **`ZheeOffsets.txt`**: header (bundle ID, executable, toàn bộ image đã load
-  kèm base + size) + ObjC theo từng image (`offset = IMP - base`, không phụ
-  thuộc ASLR) + Mach-O symbols (C/C++) của image trong app bundle + metadata header.
+  kèm base + size) + ObjC theo từng image **trong app bundle** (`offset = IMP - base`,
+  không phụ thuộc ASLR; bỏ method của system framework cho nhẹ file) + Mach-O symbols (C/C++)
+  của image trong app bundle + metadata header.
 - **`dump.cs`**: il2cpp (app Unity) qua API lúc runtime — assembly → class →
   method (tên, signature, `methodPointer`, offset/RVA) + field (tên, type, field offset).
   Tương đương output của Il2CppDumper nhưng lấy từ runtime (đã giải mã).

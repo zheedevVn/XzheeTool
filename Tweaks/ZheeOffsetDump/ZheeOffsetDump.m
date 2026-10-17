@@ -82,6 +82,21 @@ static int cmpImageBase(const void *a, const void *b) {
     return 0;
 }
 
+static BOOL *g_imgInBundle = NULL; // image thuoc app bundle? (ObjC chi dump may image nay)
+
+static void ZheeBuildBundleFlags(NSString *bundlePath, uint32_t count) {
+    free(g_imgInBundle);
+    g_imgInBundle = NULL;
+    if (count == 0) return;
+    g_imgInBundle = (BOOL *)malloc(sizeof(BOOL) * count);
+    if (!g_imgInBundle) return;
+    for (uint32_t i = 0; i < count; i++) {
+        if (!bundlePath) { g_imgInBundle[i] = YES; continue; } // khong xac dinh duoc bundle -> giu het
+        const char *n = _dyld_get_image_name(i);
+        g_imgInBundle[i] = (n && [[NSString stringWithUTF8String:n] hasPrefix:bundlePath]) ? YES : NO;
+    }
+}
+
 static BOOL ZheeImageRangeUncached(uint32_t idx, uintptr_t *outBase, uintptr_t *outEnd) {
     const struct mach_header_64 *mh = (const struct mach_header_64 *)_dyld_get_image_header(idx);
     if (!mh) return NO;
@@ -484,6 +499,7 @@ static int cmpMethodNames(const void *a, const void *b) {
         [self log:@"Executable: %@", exePath];
         [self log:@"Đã load %u image", imgCount];
         ZheeBuildImageCache(imgCount);
+        ZheeBuildBundleFlags(NSBundle.mainBundle.bundlePath, imgCount);
 
         // ---- ZheeOffsets.txt: images + ObjC + Mach-O symbols + metadata ----
         NSMutableString *out = [NSMutableString string];
@@ -498,8 +514,8 @@ static int cmpMethodNames(const void *a, const void *b) {
                               (unsigned long)b, (unsigned long)(e - b), name ? name : "?"];
         }
 
-        // ObjC theo image.
-        [out appendFormat:@"\n# --- ObjC per-image ---\n"];
+        // ObjC theo image (chi image trong app bundle).
+        [out appendFormat:@"\n# --- ObjC per-image (chi image trong app bundle) ---\n"];
         NSMutableArray<NSMutableString *> *perImage = [NSMutableArray array];
         for (uint32_t i = 0; i < imgCount; i++) [perImage addObject:[NSMutableString string]];
         long totalObjCClasses = 0, totalObjCMethods = 0;
@@ -526,6 +542,7 @@ static int cmpMethodNames(const void *a, const void *b) {
                         uintptr_t addr = (uintptr_t)method_getImplementation(methods[mi]);
                         int img = ZheeImageContaining(addr, imgCount);
                         if (img < 0) continue;
+                        if (g_imgInBundle && !g_imgInBundle[img]) continue; // bo method cua system framework
                         uintptr_t b = 0, e = 0;
                         ZheeImageRange((uint32_t)img, &b, &e);
                         const char *sel = sel_getName(method_getName(methods[mi]));
