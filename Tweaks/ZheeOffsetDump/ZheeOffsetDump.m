@@ -1090,7 +1090,7 @@ static int cMN(const void *a, const void *b) {
         @"Dylib": @"ZheeOffsetDump v4",
         @"GitHub": @"github.com/zheedevVn/XzheeTool",
     };
-    for (NSString *k in @[@"Ứng dụng", @"Bundle ID"]) {
+    for (NSString *k in @[@"Ứng dụng", @"Bundle ID", @"Phiên bản", @"Thiết bị", @"Dylib"]) {
         UIView *row = [self iR:k value:info[k] y:ay width:cw];
         [abScroll addSubview:row];
         ay += 30;
