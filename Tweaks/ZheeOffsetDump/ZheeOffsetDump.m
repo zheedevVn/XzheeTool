@@ -391,7 +391,7 @@ static int cmpMethodNames(const void *a, const void *b) {
         long totalObjCClasses = 0, totalObjCMethods = 0;
         int clsCount = objc_getClassList(NULL, 0);
         if (clsCount > 0) {
-            Class *classes = malloc(sizeof(Class) * (size_t)clsCount);
+            __unsafe_unretained Class *classes = (__unsafe_unretained Class *)malloc(sizeof(Class) * (size_t)clsCount);
             clsCount = objc_getClassList(classes, clsCount);
             qsort(classes, (size_t)clsCount, sizeof(Class), cmpClassNames);
             for (int ci = 0; ci < clsCount; ci++) {
@@ -512,8 +512,8 @@ static int cmpMethodNames(const void *a, const void *b) {
                 uint8_t t = sym->n_type;
                 if (t & N_STAB) continue;
                 if ((t & N_TYPE) != N_SECT) continue;
-                if (sym->n_strx >= strsize) continue;
-                const char *name = strtab + sym->n_strx;
+                if (sym->n_un.n_strx >= strsize) continue;
+                const char *name = strtab + sym->n_un.n_strx;
                 if (!name || !*name) continue;
                 NSString *sect = @"?";
                 if (sym->n_sect >= 1 && sym->n_sect <= sectNames.count) sect = sectNames[sym->n_sect - 1];
