@@ -1,14 +1,14 @@
-// ZheeOffsetDump.m v4 — Dylib dump offset: panel 3 tab + log live + xuất dump.cs.
+// ZheeOffsetDump.m v4 — Dylib dump offset: panel 3 tab + lg live + xuất dump.cs.
 //
 // Inject vào app bất kỳ (LC_LOAD_DYLIB). Mở app -> hiện panel -> tự chạy
-// dump, log chạy live trong panel -> xong tự xuất file ra Documents:
+// dump, lg chạy live trong panel -> xong tự xuất file ra Documents:
 //   - dump.cs          (il2cpp, kiểu Il2CppDumper: namespace -> class ->
 //                       field offset + method RVA)
 //   - ZheeOffsets.txt  (image/framework, ObjC theo image, Mach-O symbols,
 //                       metadata global-metadata.dat)
 //   - global-metadata.dat + UnityFramework (file gốc cho Il2CppDumper)
 //
-// Panel 3 tab: Dump (log + tiến trình) | Cài đặt (toggle từng phần,
+// Panel 3 tab: Dump (lg + tiến trình) | Cài đặt (toggle từng phần,
 // Full offset, kích thước panel) | About (tác giả + info app).
 // Xoay ngang/dọc tự dựng lại panel. Chạy trên mọi app (không hardcode bundle).
 //
@@ -34,6 +34,62 @@
 #import <stdlib.h>
 #import <stdarg.h>
 #import <string.h>
+#import <sys/sysctl.h>
+#import <unistd.h>
+
+// --- String obfuscation: cac dinh danh nhay cam luu duoi dang XOR, giai ma luc chay ---
+static char g_dB[256];
+static const char *zChr(const unsigned char *enc, size_t len) {
+    if (len >= sizeof(g_dB)) return "";
+    for (size_t i = 0; i < len; i++) g_dB[i] = (char)(enc[i] ^ 0x5A ^ (unsigned char)(i & 0x07));
+    g_dB[len] = 0;
+    return g_dB;
+}
+static NSString *zStr(const unsigned char *enc, size_t len) {
+    return [NSString stringWithUTF8String:zChr(enc, len)];
+}
+static BOOL zDA(void) {
+    int mib[4] = {CTL_KERN, KERN_INFO, KERN_INFO_PROC, getpid()};
+    struct kinfo_proc info;
+    size_t size = sizeof(info);
+    memset(&info, 0, sizeof(info));
+    if (sysctl(mib, 4, &info, &size, NULL, 0) != 0) return NO;
+    return (info.kp_proc.p_flag & 0x00000800) != 0; // P_TRACED
+}
+static const unsigned char kS00[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x39, 0x35, 0x36, 0x39, 0x30, 0x30, 0x00, 0x3b, 0x38, 0x2e};
+static const unsigned char kS01[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x39, 0x35, 0x36, 0x39, 0x30, 0x30, 0x00, 0x3b, 0x38, 0x2e, 0x04, 0x39, 0x2a, 0x2d, 0x3a, 0x31, 0x3f, 0x36, 0x32, 0x3d, 0x2a};
+static const unsigned char kS02[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x3c, 0x29, 0x28, 0x3d, 0x34, 0x3c, 0x33, 0x25, 0x02, 0x3d, 0x3e, 0x2c, 0x06, 0x37, 0x32, 0x3d, 0x3a, 0x3f};
+static const unsigned char kS03[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x34, 0x37, 0x3a, 0x3f, 0x3c, 0x01, 0x38, 0x39, 0x29, 0x05, 0x35, 0x39, 0x34, 0x3b};
+static const unsigned char kS04[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x34, 0x37, 0x3a, 0x3f, 0x3c, 0x01, 0x38, 0x39, 0x29, 0x05, 0x38, 0x34, 0x38, 0x2d, 0x2c, 0x03, 0x3e, 0x35, 0x2e, 0x36, 0x2d};
+static const unsigned char kS05[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x34, 0x37, 0x3a, 0x3f, 0x3c, 0x01, 0x38, 0x39, 0x29, 0x05, 0x38, 0x34, 0x38, 0x2d, 0x2c};
+static const unsigned char kS06[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x3e, 0x36, 0x3a, 0x2b, 0x2a, 0x01, 0x38, 0x39, 0x29, 0x05, 0x36, 0x3d, 0x2d, 0x36, 0x30, 0x38, 0x2e};
+static const unsigned char kS07[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x3e, 0x36, 0x3a, 0x2b, 0x2a, 0x01, 0x38, 0x39, 0x29, 0x05, 0x3d, 0x31, 0x3c, 0x32, 0x3b, 0x2f};
+static const unsigned char kS08[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x3e, 0x36, 0x3a, 0x2b, 0x2a, 0x01, 0x38, 0x39, 0x29, 0x05, 0x35, 0x39, 0x34, 0x3b};
+static const unsigned char kS09[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x3e, 0x36, 0x3a, 0x2b, 0x2a, 0x01, 0x38, 0x39, 0x29, 0x05, 0x35, 0x39, 0x34, 0x3b, 0x2c, 0x2c, 0x3c, 0x39, 0x3e};
+static const unsigned char kS10[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x30, 0x3f, 0x2f, 0x30, 0x36, 0x3a, 0x00, 0x3b, 0x38, 0x2e, 0x04, 0x36, 0x38, 0x33, 0x3a};
+static const unsigned char kS11[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x30, 0x3f, 0x2f, 0x30, 0x36, 0x3a, 0x00, 0x3b, 0x38, 0x2e, 0x04, 0x2a, 0x3c, 0x2a, 0x2a, 0x2e, 0x33, 0x05, 0x2f, 0x21, 0x29, 0x3b};
+static const unsigned char kS12[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x30, 0x3f, 0x2f, 0x30, 0x36, 0x3a, 0x00, 0x3b, 0x38, 0x2e, 0x04, 0x28, 0x38, 0x2c, 0x3e, 0x31, 0x02, 0x39, 0x34, 0x2d, 0x37, 0x2a};
+static const unsigned char kS13[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x30, 0x3f, 0x2f, 0x30, 0x36, 0x3a, 0x00, 0x3b, 0x38, 0x2e, 0x04, 0x28, 0x38, 0x2c, 0x3e, 0x31};
+static const unsigned char kS14[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x30, 0x3f, 0x2f, 0x30, 0x36, 0x3a, 0x00, 0x3b, 0x38, 0x2e, 0x04, 0x28, 0x38, 0x2c, 0x3e, 0x31, 0x02, 0x34, 0x3a, 0x35, 0x3c};
+static const unsigned char kS15[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x3b, 0x33, 0x3e, 0x34, 0x3d, 0x01, 0x38, 0x39, 0x29, 0x05, 0x35, 0x39, 0x34, 0x3b};
+static const unsigned char kS16[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x3b, 0x33, 0x3e, 0x34, 0x3d, 0x01, 0x38, 0x39, 0x29, 0x05, 0x34, 0x3e, 0x3f, 0x2d, 0x3a, 0x28};
+static const unsigned char kS17[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x3b, 0x33, 0x3e, 0x34, 0x3d, 0x01, 0x38, 0x39, 0x29, 0x05, 0x2f, 0x21, 0x29, 0x3b};
+static const unsigned char kS18[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x29, 0x23, 0x2b, 0x3d, 0x06, 0x39, 0x3a, 0x28, 0x02, 0x34, 0x3a, 0x35, 0x3c};
+static const unsigned char kS19[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x3b, 0x28, 0x3e, 0x3d};
+static const unsigned char kS20[] = {0x3e, 0x2e, 0x35, 0x29, 0x70, 0x3c, 0x2f};
+static const unsigned char kS21[] = {0x00, 0x33, 0x3d, 0x3c, 0x11, 0x39, 0x3a, 0x2e, 0x3f, 0x2f, 0x2b, 0x77, 0x2a, 0x27, 0x28};
+static const unsigned char kS22[] = {0x3d, 0x37, 0x37, 0x3b, 0x3f, 0x33, 0x71, 0x30, 0x3f, 0x2f, 0x39, 0x3d, 0x3f, 0x2b, 0x3d, 0x73, 0x3e, 0x3a, 0x2c};
+static const unsigned char kS23[] = {0x0f, 0x35, 0x31, 0x2d, 0x27, 0x19, 0x2e, 0x3c, 0x37, 0x3e, 0x2f, 0x36, 0x2c, 0x34};
+static const unsigned char kS24[] = {0x1e, 0x3a, 0x2c, 0x38, 0x71, 0x12, 0x3d, 0x33, 0x3b, 0x3c, 0x3d, 0x3d, 0x71, 0x12, 0x39, 0x29, 0x3b, 0x3f, 0x39, 0x2d, 0x3f, 0x70, 0x3b, 0x31, 0x35, 0x39, 0x39, 0x35, 0x73, 0x32, 0x39, 0x29, 0x3b, 0x3f, 0x39, 0x2d, 0x3f, 0x71, 0x38, 0x3c, 0x2e};
+static const unsigned char kS25[] = {0x17, 0x3e, 0x2c, 0x38, 0x3a, 0x3e, 0x28, 0x3c, 0x75, 0x3c, 0x34, 0x36, 0x3c, 0x3e, 0x30, 0x70, 0x37, 0x3e, 0x2c, 0x38, 0x3a, 0x3e, 0x28, 0x3c, 0x74, 0x3f, 0x39, 0x2d};
+static const unsigned char kS26[] = {0x0f, 0x35, 0x31, 0x2d, 0x27, 0x19, 0x2e, 0x3c, 0x37, 0x3e, 0x2f, 0x36, 0x2c, 0x34, 0x72, 0x3b, 0x28, 0x3a, 0x35, 0x3c, 0x29, 0x30, 0x2e, 0x36, 0x75, 0x0e, 0x36, 0x30, 0x2a, 0x26, 0x1a, 0x2f, 0x3b, 0x36, 0x3d, 0x2e, 0x31, 0x2d, 0x37};
+static const unsigned char kS27[] = {0x20, 0x33, 0x3d, 0x3c, 0x3a, 0x2a, 0x31, 0x2d, 0x74, 0x3a, 0x2d, 0x2d, 0x31};
+static const unsigned char kS28[] = {0x20, 0x33, 0x3d, 0x3c, 0x3a, 0x2a, 0x31, 0x2d, 0x74, 0x34, 0x3a, 0x33, 0x3d};
+static const unsigned char kS29[] = {0x20, 0x33, 0x3d, 0x3c, 0x3a, 0x2a, 0x31, 0x2d, 0x74, 0x28, 0x21, 0x34};
+static const unsigned char kS30[] = {0x20, 0x33, 0x3d, 0x3c, 0x3a, 0x2a, 0x31, 0x2d, 0x74, 0x32, 0x34, 0x6b, 0x3d, 0x2f, 0x2c};
+static const unsigned char kS31[] = {0x20, 0x33, 0x3d, 0x3c, 0x3a, 0x2a, 0x31, 0x2d, 0x74, 0x3e, 0x20, 0x29, 0x31, 0x2d, 0x28, 0x2f, 0x3b, 0x2c};
+static const unsigned char kS32[] = {0x20, 0x33, 0x3d, 0x3c, 0x3a, 0x2a, 0x31, 0x2d, 0x74, 0x3d, 0x2d, 0x35, 0x32};
+static const unsigned char kS33[] = {0x20, 0x33, 0x3d, 0x3c, 0x3a, 0x2a, 0x31, 0x2d, 0x74, 0x28, 0x31, 0x23, 0x3b};
 
 // ---------------------------------------------------------------------------
 // il2cpp API (opaque types, dlsym lúc runtime)
@@ -67,13 +123,13 @@ typedef const Il2CppType *(*FnFieldType)(const FieldInfo *);
 typedef char *(*FnTypeName)(const Il2CppType *);
 typedef void (*FnFree)(void *);
 
-static void *ZheeSym(const char *name) { return dlsym(RTLD_DEFAULT, name); }
+static void *zSym(const char *name) { return dlsym(RTLD_DEFAULT, name); }
 
 // ---------------------------------------------------------------------------
 // Image range
 // ---------------------------------------------------------------------------
 // Cache range cua image: tinh 1 lan moi lan dump, tim bang binary search.
-// (Ban cu goi ZheeImageRange cho MOI method -> quet lai 1342 image + parse
+// (Ban cu goi zIR cho MOI method -> quet lai 1342 image + parse
 // header moi lan -> treo voi app lon nhu Free Fire.)
 static uintptr_t *g_imgBase = NULL;
 static uintptr_t *g_imgEnd = NULL;
@@ -91,7 +147,7 @@ static int cmpImageBase(const void *a, const void *b) {
 static BOOL *g_imgInBundle = NULL; // image thuoc app bundle? (ObjC chi dump may image nay)
 static BOOL g_fullOffset = NO;     // full offset: dump ca system framework
 
-static void ZheeBuildBundleFlags(NSString *bundlePath, uint32_t count) {
+static void zBBF(NSString *bundlePath, uint32_t count) {
     free(g_imgInBundle);
     g_imgInBundle = NULL;
     if (count == 0) return;
@@ -105,7 +161,7 @@ static void ZheeBuildBundleFlags(NSString *bundlePath, uint32_t count) {
     }
 }
 
-static BOOL ZheeImageRangeUncached(uint32_t idx, uintptr_t *outBase, uintptr_t *outEnd) {
+static BOOL zIRU(uint32_t idx, uintptr_t *outBase, uintptr_t *outEnd) {
     const struct mach_header_64 *mh = (const struct mach_header_64 *)_dyld_get_image_header(idx);
     if (!mh) return NO;
     uintptr_t base = (uintptr_t)mh;
@@ -123,7 +179,7 @@ static BOOL ZheeImageRangeUncached(uint32_t idx, uintptr_t *outBase, uintptr_t *
     return YES;
 }
 
-static void ZheeBuildImageCache(uint32_t count) {
+static void zBIC(uint32_t count) {
     free(g_imgBase); free(g_imgEnd); free(g_imgSorted);
     g_imgBase = NULL; g_imgEnd = NULL; g_imgSorted = NULL; g_imgCacheCount = 0;
     if (count == 0) return;
@@ -137,23 +193,23 @@ static void ZheeBuildImageCache(uint32_t count) {
     }
     for (uint32_t i = 0; i < count; i++) {
         uintptr_t b = 0, e = 0;
-        ZheeImageRangeUncached(i, &b, &e);
+        zIRU(i, &b, &e);
         g_imgBase[i] = b; g_imgEnd[i] = e; g_imgSorted[i] = i;
     }
     qsort(g_imgSorted, count, sizeof(uint32_t), cmpImageBase);
     g_imgCacheCount = count;
 }
 
-static BOOL ZheeImageRange(uint32_t idx, uintptr_t *outBase, uintptr_t *outEnd) {
+static BOOL zIR(uint32_t idx, uintptr_t *outBase, uintptr_t *outEnd) {
     if (idx < g_imgCacheCount && g_imgBase) {
         *outBase = g_imgBase[idx];
         *outEnd = g_imgEnd[idx];
         return YES;
     }
-    return ZheeImageRangeUncached(idx, outBase, outEnd);
+    return zIRU(idx, outBase, outEnd);
 }
 
-static int ZheeImageContaining(uintptr_t p, uint32_t count) {
+static int zIC(uintptr_t p, uint32_t count) {
     if (g_imgBase && count == g_imgCacheCount) {
         int lo = 0, hi = (int)g_imgCacheCount - 1, ans = -1;
         while (lo <= hi) {
@@ -170,113 +226,113 @@ static int ZheeImageContaining(uintptr_t p, uint32_t count) {
     }
     for (uint32_t i = 0; i < count; i++) {
         uintptr_t b = 0, e = 0;
-        if (ZheeImageRangeUncached(i, &b, &e) && p >= b && p < e) return (int)i;
+        if (zIRU(i, &b, &e) && p >= b && p < e) return (int)i;
     }
     return -1;
 }
 
-static int cmpClassNames(const void *a, const void *b) {
+static int cCN(const void *a, const void *b) {
     return strcmp(class_getName(*(Class *)a) ?: "", class_getName(*(Class *)b) ?: "");
 }
-static int cmpMethodNames(const void *a, const void *b) {
+static int cMN(const void *a, const void *b) {
     return strcmp(sel_getName(method_getName(*(Method *)a)) ?: "",
                   sel_getName(method_getName(*(Method *)b)) ?: "");
 }
 
 // ---------------------------------------------------------------------------
-// Panel + log
+// Panel + lg
 // ---------------------------------------------------------------------------
-@interface ZheePassthroughWindow : UIWindow
+@interface ZPW : UIWindow
 @end
-@implementation ZheePassthroughWindow
+@implementation ZPW
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *hit = [super hitTest:point withEvent:event];
     return (hit == self) ? nil : hit;
 }
 @end
 
-@interface ZheeOffsetDump : NSObject <UIGestureRecognizerDelegate>
-@property (nonatomic, strong) UIWindow *floatWindow;
-@property (nonatomic, strong) UIButton *floatButton;
+@interface ZDC : NSObject <UIGestureRecognizerDelegate>
+@property (nonatomic, strong) UIWindow *fW;
+@property (nonatomic, strong) UIButton *fB;
 @property (nonatomic, strong) UIView *panel;
-@property (nonatomic, strong) UITextView *logView;
-@property (nonatomic, strong) UILabel *statusLabel;
-@property (nonatomic, strong) UIButton *dumpButton;
-@property (nonatomic, strong) UISegmentedControl *tabControl;
-@property (nonatomic, strong) UIView *dumpTab;
-@property (nonatomic, strong) UIView *settingsTab;
-@property (nonatomic, strong) UIView *aboutTab;
-@property (nonatomic, strong) UIProgressView *progressBar;
-@property (nonatomic, assign) BOOL dumping;
-@property (nonatomic, assign) BOOL il2cppDone;
+@property (nonatomic, strong) UITextView *lV;
+@property (nonatomic, strong) UILabel *sLbl;
+@property (nonatomic, strong) UIButton *dBtn;
+@property (nonatomic, strong) UISegmentedControl *tCtl;
+@property (nonatomic, strong) UIView *dTab;
+@property (nonatomic, strong) UIView *sTab;
+@property (nonatomic, strong) UIView *aTab;
+@property (nonatomic, strong) UIProgressView *pBar;
+@property (nonatomic, assign) BOOL dmp;
+@property (nonatomic, assign) BOOL iDone;
 // Cai dat (luu UserDefaults, prefix zheedump.)
-@property (nonatomic, assign) BOOL dumpEnabled;   // tu dong dump khi mo app
-@property (nonatomic, assign) BOOL dumpObjC;
-@property (nonatomic, assign) BOOL dumpSymtab;
-@property (nonatomic, assign) BOOL dumpIl2cpp;
-@property (nonatomic, assign) BOOL dumpExportRaw;
-@property (nonatomic, assign) BOOL dumpFull;      // full offset: ca system framework
-@property (nonatomic, assign) NSInteger sizeMode; // 0 Nho, 1 Vua, 2 Lon
+@property (nonatomic, assign) BOOL dE;   // tu dong dump khi mo app
+@property (nonatomic, assign) BOOL dO;
+@property (nonatomic, assign) BOOL dSy;
+@property (nonatomic, assign) BOOL dI;
+@property (nonatomic, assign) BOOL dER;
+@property (nonatomic, assign) BOOL dFu;      // full offset: ca system framework
+@property (nonatomic, assign) NSInteger sM; // 0 Nho, 1 Vua, 2 Lon
 @end
 
-@implementation ZheeOffsetDump
+@implementation ZDC
 
-+ (instancetype)shared { static ZheeOffsetDump *s; static dispatch_once_t t; dispatch_once(&t, ^{ s = [ZheeOffsetDump new]; }); return s; }
++ (instancetype)sh { static ZDC *s; static dispatch_once_t t; dispatch_once(&t, ^{ s = [ZDC new]; }); return s; }
 
-- (UIColor *)brandBlue { return [UIColor colorWithRed:0.11 green:0.63 blue:0.95 alpha:1]; }
-- (UIColor *)brandCyan { return [UIColor colorWithRed:0.00 green:0.82 blue:1.00 alpha:1]; }
+- (UIColor *)bB { return [UIColor colorWithRed:0.11 green:0.63 blue:0.95 alpha:1]; }
+- (UIColor *)bC { return [UIColor colorWithRed:0.00 green:0.82 blue:1.00 alpha:1]; }
 
 // Log live: ghi vào panel + NSLog.
-- (void)log:(NSString *)fmt, ... {
+- (void)lg:(NSString *)fmt, ... {
     va_list ap; va_start(ap, fmt);
     NSString *msg = [[NSString alloc] initWithFormat:fmt arguments:ap];
     va_end(ap);
-    NSLog(@"[ZheeOffsetDump] %@", msg);
+    NSLog(@"[ZDC] %@", msg);
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (!self.logView) return;
+        if (!self.lV) return;
         NSString *line = [NSString stringWithFormat:@"%@\n", msg];
-        self.logView.text = [self.logView.text stringByAppendingString:line];
-        NSRange end = NSMakeRange(self.logView.text.length, 0);
-        [self.logView scrollRangeToVisible:end];
+        self.lV.text = [self.lV.text stringByAppendingString:line];
+        NSRange end = NSMakeRange(self.lV.text.length, 0);
+        [self.lV scrollRangeToVisible:end];
     });
 }
 
-- (void)setStatus:(NSString *)s {
-    dispatch_async(dispatch_get_main_queue(), ^{ self.statusLabel.text = s; });
+- (void)sS:(NSString *)s {
+    dispatch_async(dispatch_get_main_queue(), ^{ self.sLbl.text = s; });
 }
 
-- (void)setProgress:(float)p {
-    dispatch_async(dispatch_get_main_queue(), ^{ self.progressBar.progress = p; });
+- (void)sP:(float)p {
+    dispatch_async(dispatch_get_main_queue(), ^{ self.pBar.progress = p; });
 }
 
 // ---------------------------------------------------------------------------
 // Cai dat (UserDefaults) + logo ZheeSign + helpers UI
 // ---------------------------------------------------------------------------
-- (void)loadSettings {
+- (void)lS {
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
-    self.dumpEnabled = [d objectForKey:@"zheedump.auto"] ? [d boolForKey:@"zheedump.auto"] : YES;
-    self.dumpObjC = [d objectForKey:@"zheedump.objc"] ? [d boolForKey:@"zheedump.objc"] : YES;
-    self.dumpSymtab = [d objectForKey:@"zheedump.sym"] ? [d boolForKey:@"zheedump.sym"] : YES;
-    self.dumpIl2cpp = [d objectForKey:@"zheedump.il2cpp"] ? [d boolForKey:@"zheedump.il2cpp"] : YES;
-    self.dumpExportRaw = [d objectForKey:@"zheedump.exportraw"] ? [d boolForKey:@"zheedump.exportraw"] : YES;
-    self.dumpFull = [d boolForKey:@"zheedump.full"]; // mac dinh NO: chi app bundle
-    self.sizeMode = [d integerForKey:@"zheedump.size"]; // 0 Nho, 1 Vua, 2 Lon
-    if (self.sizeMode < 0 || self.sizeMode > 2) self.sizeMode = 1;
+    self.dE = [d objectForKey:zStr(kS27, sizeof(kS27))] ? [d boolForKey:zStr(kS27, sizeof(kS27))] : YES;
+    self.dO = [d objectForKey:zStr(kS28, sizeof(kS28))] ? [d boolForKey:zStr(kS28, sizeof(kS28))] : YES;
+    self.dSy = [d objectForKey:zStr(kS29, sizeof(kS29))] ? [d boolForKey:zStr(kS29, sizeof(kS29))] : YES;
+    self.dI = [d objectForKey:zStr(kS30, sizeof(kS30))] ? [d boolForKey:zStr(kS30, sizeof(kS30))] : YES;
+    self.dER = [d objectForKey:zStr(kS31, sizeof(kS31))] ? [d boolForKey:zStr(kS31, sizeof(kS31))] : YES;
+    self.dFu = [d boolForKey:zStr(kS32, sizeof(kS32))]; // mac dinh NO: chi app bundle
+    self.sM = [d integerForKey:zStr(kS33, sizeof(kS33))]; // 0 Nho, 1 Vua, 2 Lon
+    if (self.sM < 0 || self.sM > 2) self.sM = 1;
 }
 
-- (void)saveSettings {
+- (void)sSv {
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
-    [d setBool:self.dumpEnabled forKey:@"zheedump.auto"];
-    [d setBool:self.dumpObjC forKey:@"zheedump.objc"];
-    [d setBool:self.dumpSymtab forKey:@"zheedump.sym"];
-    [d setBool:self.dumpIl2cpp forKey:@"zheedump.il2cpp"];
-    [d setBool:self.dumpExportRaw forKey:@"zheedump.exportraw"];
-    [d setBool:self.dumpFull forKey:@"zheedump.full"];
-    [d setInteger:self.sizeMode forKey:@"zheedump.size"];
+    [d setBool:self.dE forKey:zStr(kS27, sizeof(kS27))];
+    [d setBool:self.dO forKey:zStr(kS28, sizeof(kS28))];
+    [d setBool:self.dSy forKey:zStr(kS29, sizeof(kS29))];
+    [d setBool:self.dI forKey:zStr(kS30, sizeof(kS30))];
+    [d setBool:self.dER forKey:zStr(kS31, sizeof(kS31))];
+    [d setBool:self.dFu forKey:zStr(kS32, sizeof(kS32))];
+    [d setInteger:self.sM forKey:zStr(kS33, sizeof(kS33))];
 }
 
 // Logo ZheeSign: chu Z neon (cyan -> tim -> hong) tren nen toi.
-- (UIView *)zheeLogoViewWithSize:(CGFloat)s {
+- (UIView *)zL:(CGFloat)s {
     UIView *v = [[UIView alloc] initWithFrame:CGRectMake(0, 0, s, s)];
     CATextLayer *text = [CATextLayer layer];
     text.string = @"Z";
@@ -296,15 +352,16 @@ static int cmpMethodNames(const void *a, const void *b) {
     return v;
 }
 
-- (CGSize)panelSizeForMode:(NSInteger)mode screen:(CGRect)screen {
+- (CGSize)pS:(NSInteger)mode screen:(CGRect)screen {
     if (mode == 0) return CGSizeMake(MIN(screen.size.width - 32, 300), MIN(screen.size.height - 160, 420));
     if (mode == 2) return CGSizeMake(MIN(screen.size.width - 24, 430), MIN(screen.size.height - 80, 640));
     return CGSizeMake(MIN(screen.size.width - 32, 360), MIN(screen.size.height - 120, 520));
 }
 
-- (void)setup {
+- (void)st {
     @try {
-        [self loadSettings];
+        if (zDA()) return; // debugger dinh kem -> khong chay
+        [self lS];
         UIWindowScene *scene = nil;
         for (UIScene *s in UIApplication.sharedApplication.connectedScenes) {
             if ([s isKindOfClass:[UIWindowScene class]] && s.activationState == UISceneActivationStateForegroundActive) { scene = (UIWindowScene *)s; break; }
@@ -313,88 +370,88 @@ static int cmpMethodNames(const void *a, const void *b) {
 
         CGRect screen = UIScreen.mainScreen.bounds;
         CGFloat size = 56;
-        self.floatWindow = scene ? [[ZheePassthroughWindow alloc] initWithWindowScene:scene] : [[ZheePassthroughWindow alloc] initWithFrame:screen];
-        self.floatWindow.frame = screen;
-        self.floatWindow.windowLevel = UIWindowLevelAlert + 1;
-        self.floatWindow.backgroundColor = UIColor.clearColor;
+        self.fW = scene ? [[ZPW alloc] initWithWindowScene:scene] : [[ZPW alloc] initWithFrame:screen];
+        self.fW.frame = screen;
+        self.fW.windowLevel = UIWindowLevelAlert + 1;
+        self.fW.backgroundColor = UIColor.clearColor;
         // Host VC trong suot de present UIDocumentPicker (view tat tuong tac -> cham xuyen).
         UIViewController *host = [UIViewController new];
         host.view.userInteractionEnabled = NO;
-        self.floatWindow.rootViewController = host;
+        self.fW.rootViewController = host;
 
-        self.floatButton = [UIButton buttonWithType:UIButtonTypeCustom];
-        self.floatButton.frame = CGRectMake(screen.size.width - size - 16, screen.size.height / 2 - size / 2, size, size);
-        self.floatButton.layer.cornerRadius = size / 2;
-        self.floatButton.backgroundColor = [UIColor colorWithRed:0.04 green:0.04 blue:0.09 alpha:1];
-        self.floatButton.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.25].CGColor;
-        self.floatButton.layer.borderWidth = 1;
-        self.floatButton.layer.shadowColor = UIColor.blackColor.CGColor;
-        self.floatButton.layer.shadowOpacity = 0.45; self.floatButton.layer.shadowRadius = 10;
-        self.floatButton.layer.shadowOffset = CGSizeMake(0, 4);
-        UIView *logo = [self zheeLogoViewWithSize:size * 0.62];
+        self.fB = [UIButton buttonWithType:UIButtonTypeCustom];
+        self.fB.frame = CGRectMake(screen.size.width - size - 16, screen.size.height / 2 - size / 2, size, size);
+        self.fB.layer.cornerRadius = size / 2;
+        self.fB.backgroundColor = [UIColor colorWithRed:0.04 green:0.04 blue:0.09 alpha:1];
+        self.fB.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.25].CGColor;
+        self.fB.layer.borderWidth = 1;
+        self.fB.layer.shadowColor = UIColor.blackColor.CGColor;
+        self.fB.layer.shadowOpacity = 0.45; self.fB.layer.shadowRadius = 10;
+        self.fB.layer.shadowOffset = CGSizeMake(0, 4);
+        UIView *logo = [self zL:size * 0.62];
         logo.center = CGPointMake(size / 2, size / 2);
         logo.userInteractionEnabled = NO;
-        [self.floatButton addSubview:logo];
-        [self.floatButton addTarget:self action:@selector(togglePanel) forControlEvents:UIControlEventTouchUpInside];
-        [self.floatButton addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragFloat:)]];
-        [self.floatWindow addSubview:self.floatButton];
+        [self.fB addSubview:logo];
+        [self.fB addTarget:self action:@selector(tP) forControlEvents:UIControlEventTouchUpInside];
+        [self.fB addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dFl:)]];
+        [self.fW addSubview:self.fB];
 
-        [self buildPanel];
-        self.floatWindow.hidden = NO;
+        [self bP];
+        self.fW.hidden = NO;
         // Xoay ngang/doc: dung lai panel + keo nut noi vao trong man hinh.
         [[UIDevice currentDevice] beginGeneratingDeviceOrientationNotifications];
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(handleOrientationChange)
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(hO)
                                                      name:UIDeviceOrientationDidChangeNotification object:nil];
         // Mo panel ngay + chay dump neu bat tu dong.
-        if (self.dumpEnabled) [self startDump];
-        else [self log:@"Tự động dump: TẮT (bật trong tab Cài đặt)"];
+        if (self.dE) [self sD];
+        else [self lg:@"Tự động dump: TẮT (bật trong tab Cài đặt)"];
     } @catch (NSException *e) {}
 }
 
-- (void)handleOrientationChange {
+- (void)hO {
     UIDeviceOrientation o = UIDevice.currentDevice.orientation;
     if (o != UIDeviceOrientationPortrait && o != UIDeviceOrientationLandscapeLeft &&
         o != UIDeviceOrientationLandscapeRight && o != UIDeviceOrientationPortraitUpsideDown) return;
     dispatch_async(dispatch_get_main_queue(), ^{
         CGRect b = UIScreen.mainScreen.bounds;
         CGFloat r = 28;
-        CGPoint c = self.floatButton.center;
+        CGPoint c = self.fB.center;
         c.x = MAX(r, MIN(b.size.width - r, c.x));
         c.y = MAX(r + 40, MIN(b.size.height - r - 40, c.y));
-        self.floatButton.center = c;
-        [self rebuildPanel];
+        self.fB.center = c;
+        [self rP];
     });
 }
 
-// Dung lai panel (giữ log + tab) — dung khi doi kich thuoc / xoay man hinh.
-- (void)rebuildPanel {
-    NSString *savedLog = self.logView.text ?: @"";
-    NSInteger savedTab = self.tabControl ? self.tabControl.selectedSegmentIndex : 0;
+// Dung lai panel (giữ lg + tab) — dung khi doi kich thuoc / xoay man hinh.
+- (void)rP {
+    NSString *savedLog = self.lV.text ?: @"";
+    NSInteger savedTab = self.tCtl ? self.tCtl.selectedSegmentIndex : 0;
     [self.panel removeFromSuperview];
     self.panel = nil;
-    [self buildPanel];
-    self.logView.text = savedLog;
-    NSRange end = NSMakeRange(self.logView.text.length, 0);
-    [self.logView scrollRangeToVisible:end];
-    self.tabControl.selectedSegmentIndex = savedTab;
-    [self tabChanged];
+    [self bP];
+    self.lV.text = savedLog;
+    NSRange end = NSMakeRange(self.lV.text.length, 0);
+    [self.lV scrollRangeToVisible:end];
+    self.tCtl.selectedSegmentIndex = savedTab;
+    [self tC];
 }
 
-- (void)dragFloat:(UIPanGestureRecognizer *)pan {
-    CGPoint t = [pan translationInView:self.floatWindow];
-    CGPoint c = self.floatButton.center;
+- (void)dFl:(UIPanGestureRecognizer *)pan {
+    CGPoint t = [pan translationInView:self.fW];
+    CGPoint c = self.fB.center;
     c.x += t.x; c.y += t.y;
-    CGRect b = self.floatWindow.bounds;
+    CGRect b = self.fW.bounds;
     CGFloat r = 28;
     c.x = MAX(r, MIN(b.size.width - r, c.x));
     c.y = MAX(r + 40, MIN(b.size.height - r - 40, c.y));
-    self.floatButton.center = c;
-    [pan setTranslation:CGPointZero inView:self.floatWindow];
+    self.fB.center = c;
+    [pan setTranslation:CGPointZero inView:self.fW];
 }
 
-- (void)buildPanel {
+- (void)bP {
     CGRect screen = UIScreen.mainScreen.bounds;
-    CGSize sz = [self panelSizeForMode:self.sizeMode screen:screen];
+    CGSize sz = [self pS:self.sM screen:screen];
     CGFloat w = sz.width, h = sz.height;
     self.panel = [[UIView alloc] initWithFrame:CGRectMake((screen.size.width - w) / 2, (screen.size.height - h) / 2, w, h)];
     self.panel.layer.cornerRadius = 22;
@@ -404,7 +461,7 @@ static int cmpMethodNames(const void *a, const void *b) {
     self.panel.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.18].CGColor;
     self.panel.layer.borderWidth = 1;
     self.panel.clipsToBounds = YES;
-    [self.floatWindow addSubview:self.panel];
+    [self.fW addSubview:self.panel];
 
     UIVisualEffectView *blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleDark]];
     blur.frame = self.panel.bounds;
@@ -415,11 +472,11 @@ static int cmpMethodNames(const void *a, const void *b) {
     CGFloat pad = 16;
     UIView *handle = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 48)];
     [self.panel addSubview:handle];
-    UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragPanel:)];
+    UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dPn:)];
     panelPan.delegate = self;
     [handle addGestureRecognizer:panelPan];
 
-    UIView *miniLogo = [self zheeLogoViewWithSize:26];
+    UIView *miniLogo = [self zL:26];
     miniLogo.frame = CGRectMake(pad, 11, 26, 26);
     miniLogo.userInteractionEnabled = NO;
     [handle addSubview:miniLogo];
@@ -432,66 +489,66 @@ static int cmpMethodNames(const void *a, const void *b) {
     close.frame = CGRectMake(w - 40, 10, 28, 28);
     [close setImage:[UIImage systemImageNamed:@"xmark.circle.fill"] forState:UIControlStateNormal];
     close.tintColor = [UIColor.whiteColor colorWithAlphaComponent:0.7];
-    [close addTarget:self action:@selector(togglePanel) forControlEvents:UIControlEventTouchUpInside];
+    [close addTarget:self action:@selector(tP) forControlEvents:UIControlEventTouchUpInside];
     [handle addSubview:close];
 
     // Tab: Dump | Cài đặt | About.
-    self.tabControl = [[UISegmentedControl alloc] initWithItems:@[@"Dump", @"Cài đặt", @"About"]];
-    self.tabControl.frame = CGRectMake(pad, 52, w - pad * 2, 30);
-    self.tabControl.selectedSegmentIndex = 0;
-    self.tabControl.selectedSegmentTintColor = [UIColor colorWithWhite:1 alpha:0.22];
-    [self.tabControl setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateNormal];
-    [self.tabControl setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateSelected];
-    [self.tabControl addTarget:self action:@selector(tabChanged) forControlEvents:UIControlEventValueChanged];
-    [self.panel addSubview:self.tabControl];
+    self.tCtl = [[UISegmentedControl alloc] initWithItems:@[@"Dump", @"Cài đặt", @"About"]];
+    self.tCtl.frame = CGRectMake(pad, 52, w - pad * 2, 30);
+    self.tCtl.selectedSegmentIndex = 0;
+    self.tCtl.selectedSegmentTintColor = [UIColor colorWithWhite:1 alpha:0.22];
+    [self.tCtl setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateNormal];
+    [self.tCtl setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateSelected];
+    [self.tCtl addTarget:self action:@selector(tC) forControlEvents:UIControlEventValueChanged];
+    [self.panel addSubview:self.tCtl];
 
     CGFloat contentY = 90;
     CGFloat contentH = h - contentY - 12;
 
     // ---- Tab Dump ----
-    self.dumpTab = [[UIView alloc] initWithFrame:CGRectMake(0, contentY, w, contentH)];
+    self.dTab = [[UIView alloc] initWithFrame:CGRectMake(0, contentY, w, contentH)];
     CGFloat exportY = contentH - 38;
     CGFloat row1Y = exportY - 8 - 38;
     CGFloat statusY = row1Y - 8 - 20;
     CGFloat progY = statusY - 6 - 4;
     CGFloat logH = progY - 8;
-    self.logView = [[UITextView alloc] initWithFrame:CGRectMake(pad, 0, w - pad * 2, logH)];
-    self.logView.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.35];
-    self.logView.layer.cornerRadius = 12;
-    self.logView.textColor = [UIColor colorWithRed:0.7 green:1.0 blue:0.7 alpha:1];
-    self.logView.font = [UIFont monospacedSystemFontOfSize:11 weight:UIFontWeightRegular];
-    self.logView.editable = NO;
-    self.logView.selectable = YES;
-    self.logView.text = @"";
-    [self.dumpTab addSubview:self.logView];
+    self.lV = [[UITextView alloc] initWithFrame:CGRectMake(pad, 0, w - pad * 2, logH)];
+    self.lV.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.35];
+    self.lV.layer.cornerRadius = 12;
+    self.lV.textColor = [UIColor colorWithRed:0.7 green:1.0 blue:0.7 alpha:1];
+    self.lV.font = [UIFont monospacedSystemFontOfSize:11 weight:UIFontWeightRegular];
+    self.lV.editable = NO;
+    self.lV.selectable = YES;
+    self.lV.text = @"";
+    [self.dTab addSubview:self.lV];
 
-    self.progressBar = [[UIProgressView alloc] initWithFrame:CGRectMake(pad, progY, w - pad * 2, 4)];
-    self.progressBar.progressTintColor = self.brandCyan;
-    self.progressBar.trackTintColor = [UIColor colorWithWhite:1 alpha:0.15];
-    self.progressBar.progress = 0;
-    [self.dumpTab addSubview:self.progressBar];
+    self.pBar = [[UIProgressView alloc] initWithFrame:CGRectMake(pad, progY, w - pad * 2, 4)];
+    self.pBar.progressTintColor = self.bC;
+    self.pBar.trackTintColor = [UIColor colorWithWhite:1 alpha:0.15];
+    self.pBar.progress = 0;
+    [self.dTab addSubview:self.pBar];
 
-    self.statusLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad, statusY, w - pad * 2, 20)];
-    self.statusLabel.font = [UIFont systemFontOfSize:13];
-    self.statusLabel.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.8];
-    self.statusLabel.textAlignment = NSTextAlignmentCenter;
-    self.statusLabel.text = @"Đang chạy…";
-    [self.dumpTab addSubview:self.statusLabel];
+    self.sLbl = [[UILabel alloc] initWithFrame:CGRectMake(pad, statusY, w - pad * 2, 20)];
+    self.sLbl.font = [UIFont systemFontOfSize:13];
+    self.sLbl.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.8];
+    self.sLbl.textAlignment = NSTextAlignmentCenter;
+    self.sLbl.text = @"Đang chạy…";
+    [self.dTab addSubview:self.sLbl];
 
-    self.dumpButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.dBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     CGFloat bw = (w - pad * 2 - 8) / 2;
-    self.dumpButton.frame = CGRectMake(pad, row1Y, bw, 38);
-    self.dumpButton.layer.cornerRadius = 19;
+    self.dBtn.frame = CGRectMake(pad, row1Y, bw, 38);
+    self.dBtn.layer.cornerRadius = 19;
     CAGradientLayer *bg = [CAGradientLayer layer];
-    bg.frame = self.dumpButton.bounds;
-    bg.colors = @[(__bridge id)self.brandBlue.CGColor, (__bridge id)self.brandCyan.CGColor];
+    bg.frame = self.dBtn.bounds;
+    bg.colors = @[(__bridge id)self.bB.CGColor, (__bridge id)self.bC.CGColor];
     bg.startPoint = CGPointMake(0, 0.5); bg.endPoint = CGPointMake(1, 0.5);
     bg.cornerRadius = 19;
-    [self.dumpButton.layer insertSublayer:bg atIndex:0];
-    [self.dumpButton setTitle:@"Dump lại" forState:UIControlStateNormal];
-    self.dumpButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
-    [self.dumpButton addTarget:self action:@selector(dumpAgain) forControlEvents:UIControlEventTouchUpInside];
-    [self.dumpTab addSubview:self.dumpButton];
+    [self.dBtn.layer insertSublayer:bg atIndex:0];
+    [self.dBtn setTitle:@"Dump lại" forState:UIControlStateNormal];
+    self.dBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [self.dBtn addTarget:self action:@selector(dA) forControlEvents:UIControlEventTouchUpInside];
+    [self.dTab addSubview:self.dBtn];
 
     UIButton *deleteButton = [UIButton buttonWithType:UIButtonTypeCustom];
     deleteButton.frame = CGRectMake(pad + bw + 8, row1Y, bw, 38);
@@ -499,8 +556,8 @@ static int cmpMethodNames(const void *a, const void *b) {
     deleteButton.backgroundColor = [UIColor colorWithWhite:1 alpha:0.15];
     [deleteButton setTitle:@"Xóa file" forState:UIControlStateNormal];
     deleteButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
-    [deleteButton addTarget:self action:@selector(deleteFiles) forControlEvents:UIControlEventTouchUpInside];
-    [self.dumpTab addSubview:deleteButton];
+    [deleteButton addTarget:self action:@selector(dF) forControlEvents:UIControlEventTouchUpInside];
+    [self.dTab addSubview:deleteButton];
 
     UIButton *exportButton = [UIButton buttonWithType:UIButtonTypeCustom];
     exportButton.frame = CGRectMake(pad, exportY, w - pad * 2, 38);
@@ -511,29 +568,29 @@ static int cmpMethodNames(const void *a, const void *b) {
     [exportButton setTitle:@"Xuất ra Tải về" forState:UIControlStateNormal];
     exportButton.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [exportButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-    [exportButton addTarget:self action:@selector(exportFiles) forControlEvents:UIControlEventTouchUpInside];
-    [self.dumpTab addSubview:exportButton];
-    [self.panel addSubview:self.dumpTab];
+    [exportButton addTarget:self action:@selector(eF) forControlEvents:UIControlEventTouchUpInside];
+    [self.dTab addSubview:exportButton];
+    [self.panel addSubview:self.dTab];
 
     // ---- Tab Cài đặt ----
-    self.settingsTab = [[UIView alloc] initWithFrame:CGRectMake(0, contentY, w, contentH)];
-    self.settingsTab.hidden = YES;
+    self.sTab = [[UIView alloc] initWithFrame:CGRectMake(0, contentY, w, contentH)];
+    self.sTab.hidden = YES;
     UIScrollView *setScroll = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, w, contentH)];
     CGFloat sy = 0;
     NSArray *toggles = @[
-        @[@"Tự động Dump", @"Chạy dump ngay khi mở app", @(self.dumpEnabled), @1],
-        @[@"Dump ObjC", @"Class / method ObjC theo image", @(self.dumpObjC), @2],
-        @[@"Dump Symbols", @"Mach-O symtab (C / C++)", @(self.dumpSymtab), @3],
-        @[@"Dump il2cpp", @"Xuất dump.cs (app Unity)", @(self.dumpIl2cpp), @4],
-        @[@"Xuất file gốc", @"global-metadata.dat + UnityFramework", @(self.dumpExportRaw), @5],
-        @[@"Full offset", @"Cả system framework (file rất nặng)", @(self.dumpFull), @6],
+        @[@"Tự động Dump", @"Chạy dump ngay khi mở app", @(self.dE), @1],
+        @[@"Dump ObjC", @"Class / method ObjC theo image", @(self.dO), @2],
+        @[@"Dump Symbols", @"Mach-O symtab (C / C++)", @(self.dSy), @3],
+        @[@"Dump il2cpp", @"Xuất dump.cs (app Unity)", @(self.dI), @4],
+        @[@"Xuất file gốc", @"global-metadata.dat + UnityFramework", @(self.dER), @5],
+        @[@"Full offset", @"Cả system framework (file rất nặng)", @(self.dFu), @6],
     ];
     for (NSArray *t in toggles) {
         UISwitch *sw = [UISwitch new];
         sw.on = [t[2] boolValue];
         sw.tag = [t[3] integerValue];
-        [sw addTarget:self action:@selector(settingChanged:) forControlEvents:UIControlEventValueChanged];
-        UIView *row = [self toggleRowWithTitle:t[0] subtitle:t[1] sw:sw y:sy width:w];
+        [sw addTarget:self action:@selector(sC:) forControlEvents:UIControlEventValueChanged];
+        UIView *row = [self tR:t[0] subtitle:t[1] sw:sw y:sy width:w];
         [setScroll addSubview:row];
         sy += 62;
     }
@@ -544,11 +601,11 @@ static int cmpMethodNames(const void *a, const void *b) {
     [setScroll addSubview:sizeTitle];
     UISegmentedControl *sizeSeg = [[UISegmentedControl alloc] initWithItems:@[@"Nhỏ", @"Vừa", @"Lớn"]];
     sizeSeg.frame = CGRectMake(pad, sy + 28, w - pad * 2, 30);
-    sizeSeg.selectedSegmentIndex = self.sizeMode;
+    sizeSeg.selectedSegmentIndex = self.sM;
     sizeSeg.selectedSegmentTintColor = [UIColor colorWithWhite:1 alpha:0.22];
     [sizeSeg setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateNormal];
     [sizeSeg setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor} forState:UIControlStateSelected];
-    [sizeSeg addTarget:self action:@selector(sizeChanged:) forControlEvents:UIControlEventValueChanged];
+    [sizeSeg addTarget:self action:@selector(zC:) forControlEvents:UIControlEventValueChanged];
     [setScroll addSubview:sizeSeg];
     sy += 66;
     UILabel *setNote = [[UILabel alloc] initWithFrame:CGRectMake(pad, sy, w - pad * 2, 40)];
@@ -559,15 +616,15 @@ static int cmpMethodNames(const void *a, const void *b) {
     [setScroll addSubview:setNote];
     sy += 48;
     setScroll.contentSize = CGSizeMake(w, sy);
-    [self.settingsTab addSubview:setScroll];
-    [self.panel addSubview:self.settingsTab];
+    [self.sTab addSubview:setScroll];
+    [self.panel addSubview:self.sTab];
 
     // ---- Tab About ----
-    self.aboutTab = [[UIView alloc] initWithFrame:CGRectMake(0, contentY, w, contentH)];
-    self.aboutTab.hidden = YES;
+    self.aTab = [[UIView alloc] initWithFrame:CGRectMake(0, contentY, w, contentH)];
+    self.aTab.hidden = YES;
     UIScrollView *abScroll = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, w, contentH)];
     CGFloat ay = 8;
-    UIView *bigLogo = [self zheeLogoViewWithSize:72];
+    UIView *bigLogo = [self zL:72];
     bigLogo.center = CGPointMake(w / 2, ay + 36);
     [abScroll addSubview:bigLogo];
     ay += 80;
@@ -607,7 +664,7 @@ static int cmpMethodNames(const void *a, const void *b) {
         @"GitHub": @"github.com/zheedevVn/XzheeTool",
     };
     for (NSString *k in @[@"Ứng dụng", @"Bundle ID", @"Phiên bản", @"Thiết bị", @"Dylib", @"GitHub"]) {
-        UIView *row = [self infoRowWithKey:k value:info[k] y:ay width:w];
+        UIView *row = [self iR:k value:info[k] y:ay width:w];
         [abScroll addSubview:row];
         ay += 30;
     }
@@ -620,11 +677,11 @@ static int cmpMethodNames(const void *a, const void *b) {
     [abScroll addSubview:abDesc];
     ay += 68;
     abScroll.contentSize = CGSizeMake(w, ay);
-    [self.aboutTab addSubview:abScroll];
-    [self.panel addSubview:self.aboutTab];
+    [self.aTab addSubview:abScroll];
+    [self.panel addSubview:self.aTab];
 }
 
-- (UIView *)toggleRowWithTitle:(NSString *)title subtitle:(NSString *)sub sw:(UISwitch *)sw y:(CGFloat)y width:(CGFloat)w {
+- (UIView *)tR:(NSString *)title subtitle:(NSString *)sub sw:(UISwitch *)sw y:(CGFloat)y width:(CGFloat)w {
     CGFloat pad = 16;
     UIView *row = [[UIView alloc] initWithFrame:CGRectMake(pad, y, w - pad * 2, 54)];
     row.backgroundColor = [UIColor colorWithWhite:1 alpha:0.06];
@@ -640,7 +697,7 @@ static int cmpMethodNames(const void *a, const void *b) {
     return row;
 }
 
-- (UIView *)infoRowWithKey:(NSString *)key value:(NSString *)value y:(CGFloat)y width:(CGFloat)w {
+- (UIView *)iR:(NSString *)key value:(NSString *)value y:(CGFloat)y width:(CGFloat)w {
     CGFloat pad = 16;
     UIView *row = [[UIView alloc] initWithFrame:CGRectMake(pad, y, w - pad * 2, 26)];
     UILabel *k = [[UILabel alloc] initWithFrame:CGRectMake(0, 3, 92, 18)];
@@ -653,35 +710,35 @@ static int cmpMethodNames(const void *a, const void *b) {
     return row;
 }
 
-- (void)tabChanged {
-    NSInteger i = self.tabControl.selectedSegmentIndex;
-    self.dumpTab.hidden = (i != 0);
-    self.settingsTab.hidden = (i != 1);
-    self.aboutTab.hidden = (i != 2);
-    UIView *show = (i == 0) ? self.dumpTab : (i == 1) ? self.settingsTab : self.aboutTab;
+- (void)tC {
+    NSInteger i = self.tCtl.selectedSegmentIndex;
+    self.dTab.hidden = (i != 0);
+    self.sTab.hidden = (i != 1);
+    self.aTab.hidden = (i != 2);
+    UIView *show = (i == 0) ? self.dTab : (i == 1) ? self.sTab : self.aTab;
     show.alpha = 0;
     [UIView animateWithDuration:0.25 animations:^{ show.alpha = 1; }];
 }
 
-- (void)settingChanged:(UISwitch *)sw {
+- (void)sC:(UISwitch *)sw {
     switch (sw.tag) {
-        case 1: self.dumpEnabled = sw.on; break;
-        case 2: self.dumpObjC = sw.on; break;
-        case 3: self.dumpSymtab = sw.on; break;
-        case 4: self.dumpIl2cpp = sw.on; break;
-        case 5: self.dumpExportRaw = sw.on; break;
-        case 6: self.dumpFull = sw.on; break;
+        case 1: self.dE = sw.on; break;
+        case 2: self.dO = sw.on; break;
+        case 3: self.dSy = sw.on; break;
+        case 4: self.dI = sw.on; break;
+        case 5: self.dER = sw.on; break;
+        case 6: self.dFu = sw.on; break;
     }
-    [self saveSettings];
+    [self sSv];
 }
 
-- (void)sizeChanged:(UISegmentedControl *)seg {
-    self.sizeMode = seg.selectedSegmentIndex;
-    [self saveSettings];
-    [self rebuildPanel];
+- (void)zC:(UISegmentedControl *)seg {
+    self.sM = seg.selectedSegmentIndex;
+    [self sSv];
+    [self rP];
 }
 
-- (void)togglePanel {
+- (void)tP {
     BOOL show = self.panel.hidden;
     self.panel.hidden = NO;
     if (show) {
@@ -699,17 +756,17 @@ static int cmpMethodNames(const void *a, const void *b) {
     }
 }
 
-- (void)dragPanel:(UIPanGestureRecognizer *)pan {
-    CGPoint t = [pan translationInView:self.floatWindow];
+- (void)dPn:(UIPanGestureRecognizer *)pan {
+    CGPoint t = [pan translationInView:self.fW];
     CGPoint c = self.panel.center;
     c.x += t.x; c.y += t.y;
-    CGRect b = self.floatWindow.bounds;
+    CGRect b = self.fW.bounds;
     CGFloat m = 60;
     CGFloat hw = self.panel.bounds.size.width / 2, hh = self.panel.bounds.size.height / 2;
     c.x = MAX(hw - (self.panel.bounds.size.width - m), MIN(b.size.width - hw + (self.panel.bounds.size.width - m), c.x));
     c.y = MAX(hh - (self.panel.bounds.size.height - m), MIN(b.size.height - hh + (self.panel.bounds.size.height - m), c.y));
     self.panel.center = c;
-    [pan setTranslation:CGPointZero inView:self.floatWindow];
+    [pan setTranslation:CGPointZero inView:self.fW];
 }
 
 // Chỉ kéo panel khi chạm vào tay cầm mà không trúng nút Đóng.
@@ -724,22 +781,22 @@ static int cmpMethodNames(const void *a, const void *b) {
     return YES;
 }
 
-- (void)dumpAgain {
-    if (self.dumping) return;
-    dispatch_async(dispatch_get_main_queue(), ^{ self.logView.text = @""; });
-    [self startDump];
+- (void)dA {
+    if (self.dmp) return;
+    dispatch_async(dispatch_get_main_queue(), ^{ self.lV.text = @""; });
+    [self sD];
 }
 
-- (void)exportFiles {
+- (void)eF {
     NSMutableArray<NSURL *> *urls = [NSMutableArray array];
-    NSString *docs = [self docsDir];
+    NSString *docs = [self dD];
     NSFileManager *fm = [NSFileManager defaultManager];
-    for (NSString *name in @[@"dump.cs", @"ZheeOffsets.txt", @"global-metadata.dat", @"UnityFramework"]) {
+    for (NSString *name in @[zStr(kS20, sizeof(kS20)), zStr(kS21, sizeof(kS21)), zStr(kS22, sizeof(kS22)), zStr(kS23, sizeof(kS23))]) {
         NSString *p = [docs stringByAppendingPathComponent:name];
         if ([fm fileExistsAtPath:p]) [urls addObject:[NSURL fileURLWithPath:p]];
     }
     if (urls.count == 0) {
-        [self log:@"Chưa có file để xuất — bấm Dump lại trước"];
+        [self lg:@"Chưa có file để xuất — bấm Dump lại trước"];
         return;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -752,76 +809,76 @@ static int cmpMethodNames(const void *a, const void *b) {
             picker = [[UIDocumentPickerViewController alloc] initWithURLs:urls inMode:UIDocumentPickerModeExportToService];
 #pragma clang diagnostic pop
         }
-        UIViewController *host = self.floatWindow.rootViewController;
+        UIViewController *host = self.fW.rootViewController;
         if (host) {
             [host presentViewController:picker animated:YES completion:nil];
-            [self log:@"Đã mở trình chọn — chọn thư mục Tải về"];
+            [self lg:@"Đã mở trình chọn — chọn thư mục Tải về"];
         } else {
-            [self log:@"Không mở được trình chọn thư mục"];
+            [self lg:@"Không mở được trình chọn thư mục"];
         }
     });
 }
 
-- (void)deleteFiles {
+- (void)dF {
     NSFileManager *fm = [NSFileManager defaultManager];
-    NSString *docs = [self docsDir];
-    [fm removeItemAtPath:[docs stringByAppendingPathComponent:@"dump.cs"] error:nil];
-    [fm removeItemAtPath:[docs stringByAppendingPathComponent:@"ZheeOffsets.txt"] error:nil];
-    [fm removeItemAtPath:[docs stringByAppendingPathComponent:@"global-metadata.dat"] error:nil];
-    [fm removeItemAtPath:[docs stringByAppendingPathComponent:@"UnityFramework"] error:nil];
-    [self log:@"Đã xóa file dump (dump.cs, ZheeOffsets.txt, global-metadata.dat, UnityFramework)"];
+    NSString *docs = [self dD];
+    [fm removeItemAtPath:[docs stringByAppendingPathComponent:zStr(kS20, sizeof(kS20))] error:nil];
+    [fm removeItemAtPath:[docs stringByAppendingPathComponent:zStr(kS21, sizeof(kS21))] error:nil];
+    [fm removeItemAtPath:[docs stringByAppendingPathComponent:zStr(kS22, sizeof(kS22))] error:nil];
+    [fm removeItemAtPath:[docs stringByAppendingPathComponent:zStr(kS23, sizeof(kS23))] error:nil];
+    [self lg:@"Đã xóa file dump (dump.cs, ZheeOffsets.txt, global-metadata.dat, UnityFramework)"];
 }
 
 // ---------------------------------------------------------------------------
 // Dump
 // ---------------------------------------------------------------------------
-- (void)startDump {
-    if (self.dumping) return;
-    self.dumping = YES;
-    self.il2cppDone = NO;
-    [self setStatus:@"Đang chạy…"];
+- (void)sD {
+    if (self.dmp) return;
+    self.dmp = YES;
+    self.iDone = NO;
+    [self sS:@"Đang chạy…"];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0), ^{
         @try {
             for (int attempt = 0; attempt < 5; attempt++) {
-                if (attempt > 0) [self log:@"il2cpp chưa sẵn, thử lại lần %d…", attempt + 1];
-                [self runDump];
-                if (self.il2cppDone) break;
+                if (attempt > 0) [self lg:@"il2cpp chưa sẵn, thử lại lần %d…", attempt + 1];
+                [self rD];
+                if (self.iDone) break;
                 if (attempt < 4) [NSThread sleepForTimeInterval:2.0];
             }
-            [self setStatus:@"Xong!"];
+            [self sS:@"Xong!"];
         } @catch (NSException *e) {
-            [self log:@"Lỗi: %@", e];
-            [self setStatus:@"Lỗi"];
+            [self lg:@"Lỗi: %@", e];
+            [self sS:@"Lỗi"];
         }
-        self.dumping = NO;
+        self.dmp = NO;
     });
 }
 
-- (NSString *)docsDir {
+- (NSString *)dD {
     return NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
 }
 
-- (void)runDump {
+- (void)rD {
     @autoreleasepool {
-        g_fullOffset = self.dumpFull;
-        [self setProgress:0];
+        g_fullOffset = self.dFu;
+        [self sP:0];
         long skippedObjC = 0, badIl2cpp = 0;
         uint32_t imgCount = _dyld_image_count();
         NSString *exePath = [NSString stringWithUTF8String:_dyld_get_image_name(0) ?: ""];
-        [self log:@"Bắt đầu dump: %@", NSBundle.mainBundle.bundleIdentifier ?: @"?"];
-        [self log:@"Executable: %@", exePath];
-        [self log:@"Đã load %u image", imgCount];
-        ZheeBuildImageCache(imgCount);
-        ZheeBuildBundleFlags(NSBundle.mainBundle.bundlePath, imgCount);
+        [self lg:@"Bắt đầu dump: %@", NSBundle.mainBundle.bundleIdentifier ?: @"?"];
+        [self lg:@"Executable: %@", exePath];
+        [self lg:@"Đã load %u image", imgCount];
+        zBIC(imgCount);
+        zBBF(NSBundle.mainBundle.bundlePath, imgCount);
 
         // ---- ZheeOffsets.txt: images + ObjC + Mach-O symbols + metadata ----
         NSMutableString *out = [NSMutableString string];
-        [out appendFormat:@"# ZheeOffsetDump v4\n# bundle: %@\n# executable: %@\n# offset = address - base cua image chua no (khong phu thuoc ASLR)\n",
+        [out appendFormat:@"# ZDC v4\n# bundle: %@\n# executable: %@\n# offset = address - base cua image chua no (khong phu thuoc ASLR)\n",
                           NSBundle.mainBundle.bundleIdentifier ?: @"?", exePath];
         [out appendFormat:@"# --- loaded images (framework + binary) ---\n"];
         for (uint32_t i = 0; i < imgCount; i++) {
             uintptr_t b = 0, e = 0;
-            ZheeImageRange(i, &b, &e);
+            zIR(i, &b, &e);
             const char *name = _dyld_get_image_name(i);
             [out appendFormat:@"# [%u] base=0x%lx size=0x%lx %s\n", i,
                               (unsigned long)b, (unsigned long)(e - b), name ? name : "?"];
@@ -832,15 +889,15 @@ static int cmpMethodNames(const void *a, const void *b) {
         NSMutableArray<NSMutableString *> *perImage = [NSMutableArray array];
         for (uint32_t i = 0; i < imgCount; i++) [perImage addObject:[NSMutableString string]];
         long totalObjCClasses = 0, totalObjCMethods = 0;
-        int clsCount = self.dumpObjC ? objc_getClassList(NULL, 0) : 0;
+        int clsCount = self.dO ? objc_getClassList(NULL, 0) : 0;
         if (clsCount > 0) {
             __unsafe_unretained Class *classes = (__unsafe_unretained Class *)malloc(sizeof(Class) * (size_t)clsCount);
             clsCount = objc_getClassList(classes, clsCount);
-            qsort(classes, (size_t)clsCount, sizeof(Class), cmpClassNames);
+            qsort(classes, (size_t)clsCount, sizeof(Class), cCN);
             for (int ci = 0; ci < clsCount; ci++) {
                 if (ci % 500 == 0) {
-                    [self log:@"ObjC: %d/%d class…", ci, clsCount];
-                    [self setProgress:0.05f + 0.40f * (float)ci / (float)(clsCount > 0 ? clsCount : 1)];
+                    [self lg:@"ObjC: %d/%d class…", ci, clsCount];
+                    [self sP:0.05f + 0.40f * (float)ci / (float)(clsCount > 0 ? clsCount : 1)];
                 }
                 Class cls = classes[ci];
                 const char *clsName = class_getName(cls);
@@ -853,14 +910,14 @@ static int cmpMethodNames(const void *a, const void *b) {
                     unsigned int mcount = 0;
                     Method *methods = class_copyMethodList(target, &mcount);
                     if (!methods) continue;
-                    qsort(methods, mcount, sizeof(Method), cmpMethodNames);
+                    qsort(methods, mcount, sizeof(Method), cMN);
                     for (unsigned int mi = 0; mi < mcount; mi++) {
                         uintptr_t addr = (uintptr_t)method_getImplementation(methods[mi]);
-                        int img = ZheeImageContaining(addr, imgCount);
+                        int img = zIC(addr, imgCount);
                         if (img < 0) { skippedObjC++; continue; }
                         if (g_imgInBundle && !g_imgInBundle[img]) continue; // bo method cua system framework
                         uintptr_t b = 0, e = 0;
-                        ZheeImageRange((uint32_t)img, &b, &e);
+                        zIR((uint32_t)img, &b, &e);
                         const char *sel = sel_getName(method_getName(methods[mi]));
                         const char *type = method_getTypeEncoding(methods[mi]);
                         NSMutableString *buf = buckets[@(img)];
@@ -906,16 +963,16 @@ static int cmpMethodNames(const void *a, const void *b) {
             [out appendString:buf];
         }
         [out appendFormat:@"# ObjC: %ld classes, %ld methods\n", totalObjCClasses, totalObjCMethods];
-        if (self.dumpObjC) [self log:@"ObjC xong: %ld classes, %ld methods", totalObjCClasses, totalObjCMethods];
-        else [self log:@"ObjC: TẮT (theo cài đặt)"];
-        [self setProgress:0.45f];
+        if (self.dO) [self lg:@"ObjC xong: %ld classes, %ld methods", totalObjCClasses, totalObjCMethods];
+        else [self lg:@"ObjC: TẮT (theo cài đặt)"];
+        [self sP:0.45f];
 
         // Mach-O symbols (C/C++) — mac dinh chi app bundle, Full offset = ca image.
         [out appendFormat:@"\n# --- Mach-O symbols (C/C++) - %@ ---\n", g_fullOffset ? @"ca image" : @"image trong app bundle"];
         NSString *bundlePath = NSBundle.mainBundle.bundlePath;
-        if (!self.dumpSymtab) [self log:@"Symbols: TẮT (theo cài đặt)"];
-        for (uint32_t ii = 0; ii < imgCount && self.dumpSymtab; ii++) {
-            [self setProgress:0.45f + 0.15f * (float)ii / (float)(imgCount > 0 ? imgCount : 1)];
+        if (!self.dSy) [self lg:@"Symbols: TẮT (theo cài đặt)"];
+        for (uint32_t ii = 0; ii < imgCount && self.dSy; ii++) {
+            [self sP:0.45f + 0.15f * (float)ii / (float)(imgCount > 0 ? imgCount : 1)];
             const char *imgNameC = _dyld_get_image_name(ii);
             if (!imgNameC) continue;
             NSString *imgPath = [NSString stringWithUTF8String:imgNameC];
@@ -959,7 +1016,7 @@ static int cmpMethodNames(const void *a, const void *b) {
             const struct nlist_64 *syms = (const struct nlist_64 *)(linkBase + (symoff - linkFileoff));
             const char *strtab = (const char *)(linkBase + (stroff - linkFileoff));
             [out appendFormat:@"\n## symtab [%u] %@ (%u symbols)\n", ii, imgPath, nsyms];
-            [self log:@"Symbol %@: %u symbols", imgPath.lastPathComponent, nsyms];
+            [self lg:@"Symbol %@: %u symbols", imgPath.lastPathComponent, nsyms];
             long keptSyms = 0;
             for (uint32_t si = 0; si < nsyms; si++) {
                 const struct nlist_64 *sym = &syms[si];
@@ -976,25 +1033,25 @@ static int cmpMethodNames(const void *a, const void *b) {
                                   (unsigned long long)sym->n_value,
                                   (unsigned long long)(sym->n_value - textVmaddr)];
                 keptSyms++;
-                if (keptSyms % 20000 == 0) [self log:@"  symbol %@: %ld…", imgPath.lastPathComponent, keptSyms];
+                if (keptSyms % 20000 == 0) [self lg:@"  symbol %@: %ld…", imgPath.lastPathComponent, keptSyms];
             }
             [out appendFormat:@"# symtab [%u]: %ld symbols dinh nghia\n", ii, keptSyms];
         }
 
         // Metadata file.
-        [self setProgress:0.60f];
+        [self sP:0.60f];
         [out appendFormat:@"\n# --- metadata (global-metadata.dat) ---\n"];
         NSString *metaPath = nil;
         NSArray<NSString *> *candidates = @[
-            [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Data/Managed/Metadata/global-metadata.dat"],
-            [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Metadata/global-metadata.dat"],
+            [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:zStr(kS24, sizeof(kS24))],
+            [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:zStr(kS25, sizeof(kS25))],
         ];
         NSString *frameworksDir = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Frameworks"];
         NSArray *fw = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:frameworksDir error:nil];
         NSMutableArray *allCandidates = [candidates mutableCopy];
         for (NSString *f in fw ?: @[]) {
             if ([f containsString:@"Unity"]) {
-                [allCandidates addObject:[frameworksDir stringByAppendingPathComponent:[f stringByAppendingPathComponent:@"Data/Managed/Metadata/global-metadata.dat"]]];
+                [allCandidates addObject:[frameworksDir stringByAppendingPathComponent:[f stringByAppendingPathComponent:zStr(kS24, sizeof(kS24))]]];
             }
         }
         NSFileManager *fm = [NSFileManager defaultManager];
@@ -1002,7 +1059,7 @@ static int cmpMethodNames(const void *a, const void *b) {
         int depthGuard = 0;
         for (NSString *p in en) {
             if (++depthGuard > 20000) break;
-            if ([p.lastPathComponent isEqualToString:@"global-metadata.dat"]) {
+            if ([p.lastPathComponent isEqualToString:zStr(kS22, sizeof(kS22))]) {
                 [allCandidates addObject:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:p]];
                 break;
             }
@@ -1020,26 +1077,26 @@ static int cmpMethodNames(const void *a, const void *b) {
                 [out appendFormat:@"# sanity: 0x%x (mong doi 0xfab11baf)\n# metadata version: %u\n", u32[0], u32[1]];
                 [out appendFormat:@"# stringLiteralCount: %u, stringCount: %u\n", u32[3], u32[7]];
             }
-            [self log:@"Metadata: %@ (%llu bytes)", metaPath.lastPathComponent, fsize];
+            [self lg:@"Metadata: %@ (%llu bytes)", metaPath.lastPathComponent, fsize];
         } else {
             [out appendFormat:@"# khong tim thay global-metadata.dat\n"];
-            [self log:@"Không tìm thấy global-metadata.dat"];
+            [self lg:@"Không tìm thấy global-metadata.dat"];
         }
 
         // Export file goc cho Il2CppDumper tren PC: global-metadata.dat + binary UnityFramework.
-        if (!self.dumpExportRaw) [self log:@"Xuất file gốc: TẮT (theo cài đặt)"];
-        if (self.dumpExportRaw && metaPath) {
-            NSString *metaDest = [[self docsDir] stringByAppendingPathComponent:@"global-metadata.dat"];
+        if (!self.dER) [self lg:@"Xuất file gốc: TẮT (theo cài đặt)"];
+        if (self.dER && metaPath) {
+            NSString *metaDest = [[self dD] stringByAppendingPathComponent:zStr(kS22, sizeof(kS22))];
             [fm removeItemAtPath:metaDest error:nil];
             NSError *copyErr = nil;
             if ([fm copyItemAtPath:metaPath toPath:metaDest error:&copyErr]) {
-                [self log:@"Đã xuất global-metadata.dat -> Documents"];
+                [self lg:@"Đã xuất global-metadata.dat -> Documents"];
             } else {
-                [self log:@"Copy global-metadata.dat lỗi: %@", copyErr];
+                [self lg:@"Copy global-metadata.dat lỗi: %@", copyErr];
             }
         }
         NSString *ufPath = nil;
-        NSString *ufDirect = [frameworksDir stringByAppendingPathComponent:@"UnityFramework.framework/UnityFramework"];
+        NSString *ufDirect = [frameworksDir stringByAppendingPathComponent:zStr(kS26, sizeof(kS26))];
         if ([fm fileExistsAtPath:ufDirect]) {
             ufPath = ufDirect;
         } else {
@@ -1047,75 +1104,75 @@ static int cmpMethodNames(const void *a, const void *b) {
             int ufGuard = 0;
             for (NSString *p in ufe) {
                 if (++ufGuard > 5000) break;
-                if ([p.lastPathComponent isEqualToString:@"UnityFramework"]) {
+                if ([p.lastPathComponent isEqualToString:zStr(kS23, sizeof(kS23))]) {
                     ufPath = [frameworksDir stringByAppendingPathComponent:p];
                     break;
                 }
             }
         }
-        if (self.dumpExportRaw && ufPath) {
-            NSString *ufDest = [[self docsDir] stringByAppendingPathComponent:@"UnityFramework"];
+        if (self.dER && ufPath) {
+            NSString *ufDest = [[self dD] stringByAppendingPathComponent:zStr(kS23, sizeof(kS23))];
             [fm removeItemAtPath:ufDest error:nil];
             NSError *ufErr = nil;
             if ([fm copyItemAtPath:ufPath toPath:ufDest error:&ufErr]) {
                 unsigned long long usz = [[fm attributesOfItemAtPath:ufDest error:nil][NSFileSize] unsignedLongLongValue];
-                [self log:@"Đã xuất UnityFramework (%llu bytes) -> Documents", usz];
+                [self lg:@"Đã xuất UnityFramework (%llu bytes) -> Documents", usz];
             } else {
-                [self log:@"Copy UnityFramework lỗi: %@", ufErr];
+                [self lg:@"Copy UnityFramework lỗi: %@", ufErr];
             }
         } else {
-            [self log:@"Không tìm thấy UnityFramework binary"];
+            [self lg:@"Không tìm thấy UnityFramework binary"];
         }
 
-        [self setProgress:0.65f];
-        NSString *offsetsPath = [[self docsDir] stringByAppendingPathComponent:@"ZheeOffsets.txt"];
+        [self sP:0.65f];
+        NSString *offsetsPath = [[self dD] stringByAppendingPathComponent:zStr(kS21, sizeof(kS21))];
         NSError *err = nil;
         [out writeToFile:offsetsPath atomically:YES encoding:NSUTF8StringEncoding error:&err];
-        if (err) [self log:@"Ghi ZheeOffsets.txt lỗi: %@", err];
-        else [self log:@"Đã xuất ZheeOffsets.txt"];
+        if (err) [self lg:@"Ghi ZheeOffsets.txt lỗi: %@", err];
+        else [self lg:@"Đã xuất ZheeOffsets.txt"];
 
         // ---- dump.cs (il2cpp, kiểu Il2CppDumper) ----
         NSMutableString *cs = [NSMutableString string];
-        [cs appendFormat:@"// Dumped by ZheeOffsetDump\n// Bundle: %@\n// Date: %@\n// RVA = offset (VA - imageBase)\n\n",
+        [cs appendFormat:@"// Dumped by ZDC\n// Bundle: %@\n// Date: %@\n// RVA = offset (VA - imageBase)\n\n",
                          NSBundle.mainBundle.bundleIdentifier ?: @"?", [NSDate date]];
-        FnDomainGet domainGet = (FnDomainGet)ZheeSym("il2cpp_domain_get");
-        if (!self.dumpIl2cpp) {
+        FnDomainGet domainGet = (FnDomainGet)zSym(zChr(kS00, sizeof(kS00)));
+        if (!self.dI) {
             [cs appendFormat:@"// il2cpp: tat theo cai dat\n"];
-            [self log:@"il2cpp: TẮT (theo cài đặt)"];
-            self.il2cppDone = YES;
+            [self lg:@"il2cpp: TẮT (theo cài đặt)"];
+            self.iDone = YES;
         } else if (!domainGet) {
-            [cs appendFormat:@"// Khong phai app Unity (khong co il2cpp_domain_get)\n"];
-            [self log:@"Không phải app Unity — dump.cs chỉ có header"];
-            self.il2cppDone = YES;
+            [cs appendFormat:@"// Khong phai app Unity (khong co domain API)\n"];
+            [self lg:@"Không phải app Unity — dump.cs chỉ có header"];
+            self.iDone = YES;
         } else {
             Il2CppDomain *domain = domainGet();
             if (!domain) {
                 [cs appendFormat:@"// il2cpp chua khoi tao\n"];
-                [self log:@"il2cpp chưa khởi tạo"];
+                [self lg:@"il2cpp chưa khởi tạo"];
             } else {
-                FnDomainAssemblies assembliesFn = (FnDomainAssemblies)ZheeSym("il2cpp_domain_get_assemblies");
-                FnAssemblyImage assemblyImage = (FnAssemblyImage)ZheeSym("il2cpp_assembly_get_image");
-                FnImageName imageName = (FnImageName)ZheeSym("il2cpp_image_get_name");
-                FnImageClassCount classCountFn = (FnImageClassCount)ZheeSym("il2cpp_image_get_class_count");
-                FnImageGetClass getClass = (FnImageGetClass)ZheeSym("il2cpp_image_get_class");
-                FnClassMethods classMethods = (FnClassMethods)ZheeSym("il2cpp_class_get_methods");
-                FnClassFields classFields = (FnClassFields)ZheeSym("il2cpp_class_get_fields");
-                FnClassName className = (FnClassName)ZheeSym("il2cpp_class_get_name");
-                FnClassNamespace classNs = (FnClassNamespace)ZheeSym("il2cpp_class_get_namespace");
-                FnMethodName methodName = (FnMethodName)ZheeSym("il2cpp_method_get_name");
-                FnMethodRet methodRet = (FnMethodRet)ZheeSym("il2cpp_method_get_return_type");
-                FnMethodParamCount paramCount = (FnMethodParamCount)ZheeSym("il2cpp_method_get_param_count");
-                FnMethodParam paramAt = (FnMethodParam)ZheeSym("il2cpp_method_get_param");
-                FnMethodParamName paramName = (FnMethodParamName)ZheeSym("il2cpp_method_get_param_name");
-                FnFieldName fieldName = (FnFieldName)ZheeSym("il2cpp_field_get_name");
-                FnFieldOffset fieldOffset = (FnFieldOffset)ZheeSym("il2cpp_field_get_offset");
-                FnFieldType fieldType = (FnFieldType)ZheeSym("il2cpp_field_get_type");
-                FnTypeName typeName = (FnTypeName)ZheeSym("il2cpp_type_get_name");
-                FnFree il2cppFree = (FnFree)ZheeSym("il2cpp_free");
+                FnDomainAssemblies assembliesFn = (FnDomainAssemblies)zSym(zChr(kS01, sizeof(kS01)));
+                FnAssemblyImage assemblyImage = (FnAssemblyImage)zSym(zChr(kS02, sizeof(kS02)));
+                FnImageName imageName = (FnImageName)zSym(zChr(kS03, sizeof(kS03)));
+                FnImageClassCount classCountFn = (FnImageClassCount)zSym(zChr(kS04, sizeof(kS04)));
+                FnImageGetClass getClass = (FnImageGetClass)zSym(zChr(kS05, sizeof(kS05)));
+                FnClassMethods classMethods = (FnClassMethods)zSym(zChr(kS06, sizeof(kS06)));
+                FnClassFields classFields = (FnClassFields)zSym(zChr(kS07, sizeof(kS07)));
+                FnClassName className = (FnClassName)zSym(zChr(kS08, sizeof(kS08)));
+                FnClassNamespace classNs = (FnClassNamespace)zSym(zChr(kS09, sizeof(kS09)));
+                FnMethodName methodName = (FnMethodName)zSym(zChr(kS10, sizeof(kS10)));
+                FnMethodRet methodRet = (FnMethodRet)zSym(zChr(kS11, sizeof(kS11)));
+                FnMethodParamCount paramCount = (FnMethodParamCount)zSym(zChr(kS12, sizeof(kS12)));
+                FnMethodParam paramAt = (FnMethodParam)zSym(zChr(kS13, sizeof(kS13)));
+                FnMethodParamName paramName = (FnMethodParamName)zSym(zChr(kS14, sizeof(kS14)));
+                FnFieldName fieldName = (FnFieldName)zSym(zChr(kS15, sizeof(kS15)));
+                FnFieldOffset fieldOffset = (FnFieldOffset)zSym(zChr(kS16, sizeof(kS16)));
+                FnFieldType fieldType = (FnFieldType)zSym(zChr(kS17, sizeof(kS17)));
+                FnTypeName typeName = (FnTypeName)zSym(zChr(kS18, sizeof(kS18)));
+                FnFree il2cppFree = (FnFree)zSym(zChr(kS19, sizeof(kS19)));
                 if (!assembliesFn || !assemblyImage || !getClass || !classMethods || !className) {
                     [cs appendFormat:@"// Thieu il2cpp API (khong dump duoc)\n"];
-                    [self log:@"Thiếu il2cpp API"];
-                    self.il2cppDone = YES;
+                    [self lg:@"Thiếu il2cpp API"];
+                    self.iDone = YES;
                 } else {
                     size_t asmCount = 0;
                     const Il2CppAssembly **asms = assembliesFn(domain, &asmCount);
@@ -1125,8 +1182,8 @@ static int cmpMethodNames(const void *a, const void *b) {
                         if (!img) continue;
                         const char *asmName = imageName ? (imageName(img) ?: "?") : "?";
                         [cs appendFormat:@"// Image: %s\n", asmName];
-                        [self log:@"Dump il2cpp: %s", [NSString stringWithUTF8String:asmName]];
-                        [self setProgress:0.65f + 0.35f * (float)ai / (float)(asmCount > 0 ? asmCount : 1)];
+                        [self lg:@"Dump il2cpp: %s", [NSString stringWithUTF8String:asmName]];
+                        [self sP:0.65f + 0.35f * (float)ai / (float)(asmCount > 0 ? asmCount : 1)];
                         size_t cc = classCountFn ? classCountFn(img) : 0;
                         // Nhóm class theo namespace.
                         NSMutableDictionary<NSString *, NSMutableString *> *nsBuckets = [NSMutableDictionary dictionary];
@@ -1183,10 +1240,10 @@ static int cmpMethodNames(const void *a, const void *b) {
                                         }
                                     }
                                     [sig appendString:@")"];
-                                    int imgIdx = ZheeImageContaining((uintptr_t)mp, imgCount);
+                                    int imgIdx = zIC((uintptr_t)mp, imgCount);
                                     if (imgIdx < 0) badIl2cpp++;
                                     uintptr_t b = 0, e = 0;
-                                    if (imgIdx >= 0) ZheeImageRange((uint32_t)imgIdx, &b, &e);
+                                    if (imgIdx >= 0) zIR((uint32_t)imgIdx, &b, &e);
                                     unsigned long rva = imgIdx >= 0 ? (unsigned long)((uintptr_t)mp - b) : 0;
                                     [bucket appendFormat:@"\t\tpublic %@; // 0x%lx\n", sig, rva];
                                     totalMethods++;
@@ -1194,7 +1251,7 @@ static int cmpMethodNames(const void *a, const void *b) {
                             }
                             [bucket appendFormat:@"\t}\n\n"];
                             totalClasses++;
-                            if (totalClasses % 500 == 0) [self log:@"  il2cpp: %ld classes…", totalClasses];
+                            if (totalClasses % 500 == 0) [self lg:@"  il2cpp: %ld classes…", totalClasses];
                         }
                         // Xuất namespace đã sắp xếp.
                         NSArray *sortedNs = [nsOrder sortedArrayUsingSelector:@selector(compare:)];
@@ -1203,32 +1260,32 @@ static int cmpMethodNames(const void *a, const void *b) {
                         }
                     }
                     [cs appendFormat:@"// Tong: %ld classes, %ld methods, %ld fields\n", totalClasses, totalMethods, totalFields];
-                    [self log:@"il2cpp xong: %ld classes, %ld methods, %ld fields", totalClasses, totalMethods, totalFields];
-                    self.il2cppDone = YES;
+                    [self lg:@"il2cpp xong: %ld classes, %ld methods, %ld fields", totalClasses, totalMethods, totalFields];
+                    self.iDone = YES;
                 }
             }
         }
-        NSString *csPath = [[self docsDir] stringByAppendingPathComponent:@"dump.cs"];
+        NSString *csPath = [[self dD] stringByAppendingPathComponent:zStr(kS20, sizeof(kS20))];
         [cs writeToFile:csPath atomically:YES encoding:NSUTF8StringEncoding error:&err];
-        if (err) [self log:@"Ghi dump.cs lỗi: %@", err];
-        else [self log:@"Đã xuất dump.cs -> %@", csPath];
-        [self setProgress:1.0f];
-        if (skippedObjC == 0 && badIl2cpp == 0) [self log:@"Kiểm tra: tất cả offset nằm trong image — chính xác"];
-        else [self log:@"Kiểm tra: ObjC bỏ qua %ld method, il2cpp %ld method ngoài image", skippedObjC, badIl2cpp];
+        if (err) [self lg:@"Ghi dump.cs lỗi: %@", err];
+        else [self lg:@"Đã xuất dump.cs -> %@", csPath];
+        [self sP:1.0f];
+        if (skippedObjC == 0 && badIl2cpp == 0) [self lg:@"Kiểm tra: tất cả offset nằm trong image — chính xác"];
+        else [self lg:@"Kiểm tra: ObjC bỏ qua %ld method, il2cpp %ld method ngoài image", skippedObjC, badIl2cpp];
         NSMutableArray *doneFiles = [NSMutableArray array];
-        [doneFiles addObject:@"ZheeOffsets.txt"];
-        if (self.dumpIl2cpp) [doneFiles addObject:@"dump.cs"];
-        if (self.dumpExportRaw) { [doneFiles addObject:@"global-metadata.dat"]; [doneFiles addObject:@"UnityFramework"]; }
-        [self log:@"HOÀN TẤT. Documents: %@", [doneFiles componentsJoinedByString:@", "]];
+        [doneFiles addObject:zStr(kS21, sizeof(kS21))];
+        if (self.dI) [doneFiles addObject:zStr(kS20, sizeof(kS20))];
+        if (self.dER) { [doneFiles addObject:zStr(kS22, sizeof(kS22))]; [doneFiles addObject:zStr(kS23, sizeof(kS23))]; }
+        [self lg:@"HOÀN TẤT. Documents: %@", [doneFiles componentsJoinedByString:@", "]];
     }
 }
 
 @end
 
-__attribute__((constructor)) static void ZheeOffsetDumpInit(void) {
+__attribute__((constructor)) static void ZDCInit(void) {
     // Delay ngan 1–2s (lech timing, tranh fingerprint), roi hien panel + chay dump.
     double delay = 1.0 + (double)arc4random_uniform(1000) / 1000.0;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        @try { [[ZheeOffsetDump shared] setup]; } @catch (NSException *e) {}
+        @try { [[ZDC sh] st]; } @catch (NSException *e) {}
     });
 }

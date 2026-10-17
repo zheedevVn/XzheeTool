@@ -50,10 +50,32 @@ Trong Documents của app, sau khi dump xong:
 - **Frida** (máy tính): `frida -U -f <bundle> -l script.js` — dùng
   `Module.getBaseAddress()` + offset trong output để hook/đọc.
 
-## Build (GitHub Action)
+## Bảo vệ dylib (chống dịch ngược)
 
-Workflow `.github/workflows/build-offsetdump.yml` build bằng `xcrun` trên
-runner macOS, upload `ZheeOffsetDump.dylib` làm artifact.
+Source được harden để dylib khó bị phân tích:
+
+- **Chuỗi nhạy cảm mã hóa XOR**: tên API il2cpp, tên file output,
+  đường dẫn metadata, key UserDefaults đều lưu dạng byte XOR, chỉ giải mã
+  lúc chạy — `strings` không thấy.
+- **Tên trung tính**: class ObjC + method + property + hàm C đều đổi sang
+  tên ngắn vô nghĩa (`ZDC`, `rD`, `bP`…) — class-dump không lộ chức năng.
+- **Chặn debugger**: nếu có debugger đính kèm (P_TRACED), dylib không chạy.
+- **Strip symbol** (cần sửa workflow, xem dưới): bỏ bảng symbol local khỏi
+  dylib — tên hàm C / biến static không còn trong binary.
+
+Sửa bước Build trong `.github/workflows/build-offsetdump.yml` (trên github.com):
+
+```yaml
+xcrun -sdk iphoneos clang -arch arm64 -dynamiclib -fobjc-arc -Os \
+  -isysroot "$SDK" -miphoneos-version-min=14.0 \
+  -Wl,-x \
+  -framework Foundation -framework UIKit \
+  -framework CoreGraphics -framework QuartzCore \
+  -o ZheeOffsetDump.dylib Tweaks/ZheeOffsetDump/ZheeOffsetDump.m
+```
+
+**Giới hạn nói thẳng**: obfuscation chỉ nâng rào cản — người quyết tâm với
+Hopper/IDA + patch vẫn phân tích được. Không có cách nào chống tuyệt đối.
 
 ## Chống phát hiện (anti-cheat / anti-dump)
 
