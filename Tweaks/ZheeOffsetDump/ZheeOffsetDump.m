@@ -90,6 +90,7 @@ static const unsigned char kS30[] = {0x20, 0x33, 0x3d, 0x3c, 0x3a, 0x2a, 0x31, 0
 static const unsigned char kS31[] = {0x20, 0x33, 0x3d, 0x3c, 0x3a, 0x2a, 0x31, 0x2d, 0x74, 0x3e, 0x20, 0x29, 0x31, 0x2d, 0x28, 0x2f, 0x3b, 0x2c};
 static const unsigned char kS32[] = {0x20, 0x33, 0x3d, 0x3c, 0x3a, 0x2a, 0x31, 0x2d, 0x74, 0x3d, 0x2d, 0x35, 0x32};
 static const unsigned char kS33[] = {0x20, 0x33, 0x3d, 0x3c, 0x3a, 0x2a, 0x31, 0x2d, 0x74, 0x28, 0x31, 0x23, 0x3b};
+static const unsigned char kS34[] = {0x33, 0x37, 0x6a, 0x3a, 0x2e, 0x2f, 0x03, 0x3b, 0x33, 0x3e, 0x34, 0x3d, 0x01, 0x38, 0x39, 0x29, 0x05, 0x3d, 0x34, 0x38, 0x39, 0x2c};
 
 // ---------------------------------------------------------------------------
 // il2cpp API (opaque types, dlsym lúc runtime)
@@ -119,6 +120,7 @@ typedef const Il2CppType *(*FnMethodParam)(const MethodInfo *, uint32_t);
 typedef const char *(*FnMethodParamName)(const MethodInfo *, uint32_t);
 typedef const char *(*FnFieldName)(const FieldInfo *);
 typedef size_t (*FnFieldOffset)(const FieldInfo *);
+typedef uint32_t (*FnFieldFlags)(const FieldInfo *); // FIELD_ATTRIBUTE_STATIC = 0x0010
 typedef const Il2CppType *(*FnFieldType)(const FieldInfo *);
 typedef char *(*FnTypeName)(const Il2CppType *);
 typedef void (*FnFree)(void *);
@@ -1826,6 +1828,7 @@ static int cMN(const void *a, const void *b) {
                 FnMethodParamName paramName = (FnMethodParamName)zSym(zChr(kS14, sizeof(kS14)));
                 FnFieldName fieldName = (FnFieldName)zSym(zChr(kS15, sizeof(kS15)));
                 FnFieldOffset fieldOffset = (FnFieldOffset)zSym(zChr(kS16, sizeof(kS16)));
+                FnFieldFlags fieldFlags = (FnFieldFlags)zSym(zChr(kS34, sizeof(kS34)));
                 FnFieldType fieldType = (FnFieldType)zSym(zChr(kS17, sizeof(kS17)));
                 FnTypeName typeName = (FnTypeName)zSym(zChr(kS18, sizeof(kS18)));
                 FnFree il2cppFree = (FnFree)zSym(zChr(kS19, sizeof(kS19)));
@@ -1871,7 +1874,12 @@ static int cMN(const void *a, const void *b) {
                                         if (tn) { ft = [NSString stringWithUTF8String:tn]; if (il2cppFree) il2cppFree(tn); }
                                     }
                                     size_t fo = fieldOffset ? fieldOffset(f) : 0;
-                                    [bucket appendFormat:@"\t\tpublic %@ %@; // 0x%lx\n", ft, [NSString stringWithUTF8String:fName], (unsigned long)fo];
+                                    // Field static (vd hang enum HitPart) khong co offset instance -> in // static, khong in // 0x0 gay hieu nham.
+                                    if (fieldFlags && (fieldFlags(f) & 0x0010)) {
+                                        [bucket appendFormat:@"\t\tpublic %@ %@; // static\n", ft, [NSString stringWithUTF8String:fName]];
+                                    } else {
+                                        [bucket appendFormat:@"\t\tpublic %@ %@; // 0x%lx\n", ft, [NSString stringWithUTF8String:fName], (unsigned long)fo];
+                                    }
                                     totalFields++;
                                 }
                                 [bucket appendFormat:@"\n"];
